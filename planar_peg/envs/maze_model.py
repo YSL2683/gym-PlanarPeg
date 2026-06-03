@@ -184,11 +184,11 @@ class MazeModel:
                         'pos': f'{x} {y} 0.05'
                     })
                     
-                    # Inner width = 0.09m (half: 0.045m, 1.5x agent width), Inner depth = 0.11m (half: 0.055m)
+                    # Inner width = 0.09m (half: 0.045m, 1.5x agent width), Inner depth = 0.13m (half: 0.065m)
                     # Wall thickness = 0.01m (half: 0.005m)
                     wall_t = 0.005
                     inner_h = 0.045
-                    inner_d = 0.055
+                    inner_d = 0.065
                     
                     # 1. Back wall (closing the pocket on the right side)
                     ET.SubElement(goal, 'geom', {
@@ -204,7 +204,7 @@ class MazeModel:
                     ET.SubElement(goal, 'geom', {
                         'name': 'goal_top_geom',
                         'type': 'box',
-                        'pos': '0.035 0.05 0',
+                        'pos': '0.025 0.05 0',
                         'size': f'{inner_d} {wall_t} 0.05',
                         'rgba': '0.1 0.7 0.2 0.6',
                         'condim': '3'
@@ -214,7 +214,7 @@ class MazeModel:
                     ET.SubElement(goal, 'geom', {
                         'name': 'goal_bottom_geom',
                         'type': 'box',
-                        'pos': '0.035 -0.05 0',
+                        'pos': '0.025 -0.05 0',
                         'size': f'{inner_d} {wall_t} 0.05',
                         'rgba': '0.1 0.7 0.2 0.6',
                         'condim': '3'

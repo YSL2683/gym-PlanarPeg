@@ -20,7 +20,7 @@ class PlanarPegEnv(gym.Env):
         cell_size: float = 0.2,
         n_substeps: int = 25,
         render_mode: Optional[str] = None,
-        max_episode_steps: int = 500,
+        max_episode_steps: int = 1000,
     ):
         """
         Initializes the environment.
@@ -38,11 +38,11 @@ class PlanarPegEnv(gym.Env):
         if grid is None:
             grid = [
                 "WWWWWWWWWWWW",
-                "W..........W",
+                "W....O.....W",
                 "W....O.....W",
                 "W.S......C.W",
                 "W....O.....W",
-                "W..........W",
+                "W....O.....W",
                 "WWWWWWWWWWWW"
             ]
             
@@ -121,23 +121,45 @@ class PlanarPegEnv(gym.Env):
 
     def _check_success(self, x: float, y: float, theta: float) -> bool:
         """
-        Evaluates whether the agent has entered the C-shaped goal slot 
-        parallel to the target alignment.
+        Evaluates whether the agent's body is fully inside the C-shaped goal pocket.
+        Determined by checking if all 4 corners of the rectangular agent are inside
+        the boundaries of the goal pocket.
         """
         gx, gy = self.goal_pos
-        dx = x - gx
-        dy = y - gy
-        dtheta = self._normalize_angle(theta)
         
-        # Since the C-shaped slot opens towards the left (-X):
-        # 1. X alignment: Agent should be fully inside the C slot (dx in [0.0, 0.06]).
-        # 2. Y alignment: Agent's vertical deviation from goal center must be minimal (|dy| <= 0.015).
-        # 3. Orientation alignment: Yaw axis should match the slot parallel axis (|dtheta| <= 0.087 rad ~ 5 degrees).
-        is_x_aligned = 0.0 <= dx <= 0.06
-        is_y_aligned = abs(dy) <= 0.015
-        is_theta_aligned = abs(dtheta) <= 0.087
+        # Goal pocket inner boundaries relative to goal_pos
+        # Inner depth = 0.13m, opens to the left (-X) from the back wall at x = gx + 0.09
+        # Inner width = 0.09m s.t. y ranges in [gy - 0.045, gy + 0.045]
+        x_min = gx - 0.04
+        x_max = gx + 0.09
+        y_min = gy - 0.045
+        y_max = gy + 0.045
         
-        return is_x_aligned and is_y_aligned and is_theta_aligned
+        # Agent size: half-width = 0.05m (X-axis), half-height = 0.03m (Y-axis)
+        half_w = 0.05
+        half_h = 0.03
+        
+        # 4 corner coordinates in agent local frame
+        corners_local = [
+            [half_w, half_h],
+            [half_w, -half_h],
+            [-half_w, half_h],
+            [-half_w, -half_h]
+        ]
+        
+        cos_t = np.cos(theta)
+        sin_t = np.sin(theta)
+        
+        for cx, cy in corners_local:
+            # Transform to world coordinates
+            wx = x + cx * cos_t - cy * sin_t
+            wy = y + cx * sin_t + cy * cos_t
+            
+            # If any corner lies outside the pocket bounds, it is not fully inside
+            if not (x_min <= wx <= x_max and y_min <= wy <= y_max):
+                return False
+                
+        return True
         
     def step(self, action: np.ndarray) -> Tuple[Dict[str, np.ndarray], float, bool, bool, Dict[str, Any]]:
         """

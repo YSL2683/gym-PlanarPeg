@@ -81,9 +81,9 @@ The observation space is a goal-aware dictionary consisting of 3 keys:
 ## Rewards
 * **Success (Sparse):** When the agent successfully docks parallel inside the goal slot, a reward of **`+1.0`** is returned, and the episode terminates.
   * **Success Criteria**: 
-    1. *X alignment:* Agent center must be parked inside the C-slot ($0.0 \le dx \le 0.06\text{m}$).
-    2. *Y alignment:* Vertical offset from the goal center must be minimal ($|dy| \le 0.015\text{m}$).
-    3. *Yaw alignment:* Angular offset from parallel docking must be within $\pm 5^\circ$ ($|d\theta| \le 0.087\text{rad}$).
+    1. The agent is considered successfully docked when **all 4 corners of its rectangular body** are strictly inside the goal pocket boundary.
+    2. *Goal boundaries:* $X \in [gx - 0.04, gx + 0.09]$ (depth: $0.13\text{m}$), $Y \in [gy - 0.045, gy + 0.045]$ (width: $0.09\text{m}$).
+    3. This ensures the peg is fully parallel and entirely inside the pocket without structural collision.
 * **Time Penalty:** To encourage efficiency, a small time cost penalty of **`-0.01`** is applied at every step until docking is achieved.
 
 ---
