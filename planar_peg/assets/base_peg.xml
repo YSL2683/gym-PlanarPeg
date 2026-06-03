@@ -1,0 +1,47 @@
+<mujoco model="planar_peg_base">
+    <compiler coordinate="local" angle="degree"/>
+    
+    <option timestep="0.002" integrator="RK4">
+        <flag warmstart="enable"/>
+    </option>
+
+    <default>
+        <geom condim="3" friction="1.0 0.005 0.0001" margin="0.001" density="1000"/>
+        <joint damping="10.0" armature="0.05"/>
+    </default>
+
+    <worldbody>
+        <!-- Lighting -->
+        <light directional="true" diffuse="0.8 0.8 0.8" specular="0.2 0.2 0.2" pos="0 0 4" dir="0 0 -1"/>
+        
+        <!-- Floor -->
+        <geom name="floor" type="plane" size="5 5 0.1" rgba="0.9 0.9 0.9 1" condim="3"/>
+
+        <!-- Top-view Camera (Static in Worldbody) -->
+        <camera name="top" pos="0.0 0.0 3.0" fovy="50"/>
+
+        <!-- Mocap Target Body (Visual target for control) -->
+        <body name="mocap" mocap="true" pos="0 0 0.025">
+            <geom type="box" size="0.05 0.03 0.025" rgba="1 0 0 0.4" conaffinity="0" contype="0"/>
+        </body>
+
+        <!-- Actual Agent Body (3-DoF Planar) -->
+        <body name="agent" pos="0 0 0.025">
+            <!-- 3-DoF Joint Constraints for Planar Motion -->
+            <joint name="agent_x" type="slide" axis="1 0 0" range="-3 3" limited="true" damping="20.0" armature="0.1"/>
+            <joint name="agent_y" type="slide" axis="0 1 0" range="-3 3" limited="true" damping="20.0" armature="0.1"/>
+            <joint name="agent_rz" type="hinge" axis="0 0 1" range="-180 180" limited="true" damping="5.0" armature="0.05"/>
+            
+            <!-- Agent Visual & Collision Geometry -->
+            <geom name="agent_geom" type="box" size="0.05 0.03 0.025" rgba="0.2 0.6 0.8 1" condim="3"/>
+            
+            <!-- Front-view Camera (First Person View) -->
+            <camera name="front" pos="0.05 0 0" xyaxes="0 -1 0 0 0 1" fovy="70"/>
+        </body>
+    </worldbody>
+
+    <equality>
+        <!-- Weld constraint for impedance-like control via mocap body -->
+        <weld body1="mocap" body2="agent" solref="0.02 1.0" solimp="0.9 0.95 0.001 0.5 2"/>
+    </equality>
+</mujoco>
