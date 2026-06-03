@@ -7,7 +7,7 @@ setup(
     author="DeepMind Pair Programmer",
     packages=find_packages(),
     install_requires=[
-        "gymnasium>=0.26.0",
+        "gymnasium-robotics",
         "numpy>=1.21.0",
         "mujoco>=3.0.0",
         "pygame>=2.1.0",  # Used for gamepad/keyboard teleoperation

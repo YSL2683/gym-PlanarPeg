@@ -14,7 +14,7 @@ cd gym-PlanarPeg
 conda create -n planar_peg python=3.10 -y
 conda activate planar_peg
 
-# Install the package in editable mode (auto-installs MuJoCo, Gymnasium, Pygame, H5Py)
+# Install the package in editable mode (auto-installs MuJoCo, gymnasium-robotics, Pygame, H5Py)
 pip install -e .
 ```
 
@@ -65,6 +65,10 @@ The observation space is a goal-aware dictionary consisting of 3 keys:
 * `image_top`: Top-down static RGB viewpoint rendering of the entire maze (`Box(0, 255, (84, 84, 3), dtype=np.uint8)`).
 * `image_front`: First-person forward-looking RGB viewpoint rendering attached to the front face of the rectangular peg (`Box(0, 255, (84, 84, 3), dtype=np.uint8)`).
 * `proprioception`: 3-dimensional kinematic array of the actual rectangular peg's absolute world pose (`Box(-inf, inf, (3,), dtype=np.float32)`):
+
+| Top-view (`image_top`) | Front-view (`image_front`) |
+| :---: | :---: |
+| ![Top-view](media/top_view_image.png) | ![Front-view](media/front_view_image.png) |
 
 | Num | Observation | Min | Max | Unit | Description |
 | :--- | :--- | :---: | :---: | :---: | :--- |

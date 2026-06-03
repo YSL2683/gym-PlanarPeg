@@ -139,33 +139,63 @@ class MazeModel:
                         'pos': f'{x} {y} 0.05'
                     })
                     half_w = self.cell_size / 2.0
+                    
+                    # Gap narrowing and wall connecting:
+                    # Dynamically calculate the Y size and position offsets to connect the two obstacles
+                    # directly to the outer boundary walls while leaving a precise 0.09m gap in the middle.
+                    size_y = half_w
+                    pos_y = 0.0
+                    
+                    y_wall_top = self.y_offset - self.cell_size / 2.0
+                    inner_gap_half = 0.045  # half of 0.09m gap (1.5x agent width)
+                    
+                    if r < self.height // 2:  # Top obstacle
+                        target_y_max = y_wall_top
+                        target_y_min = inner_gap_half
+                        
+                        target_length = target_y_max - target_y_min
+                        size_y = target_length / 2.0
+                        world_center_y = (target_y_max + target_y_min) / 2.0
+                        pos_y = world_center_y - y
+                        
+                    elif r > self.height // 2:  # Bottom obstacle
+                        target_y_max = -inner_gap_half
+                        target_y_min = -y_wall_top
+                        
+                        target_length = target_y_max - target_y_min
+                        size_y = target_length / 2.0
+                        world_center_y = (target_y_max + target_y_min) / 2.0
+                        pos_y = world_center_y - y
+                        
                     ET.SubElement(obstacle, 'geom', {
                         'name': f'obstacle_geom_{r}_{c}',
                         'type': 'box',
-                        'size': f'{half_w} {half_w} 0.05',
+                        'pos': f'0 {pos_y} 0',
+                        'size': f'{half_w} {size_y} 0.05',
                         'rgba': '0.2 0.4 0.8 1.0', # Blue color
                         'condim': '3'
                     })
                     
                 elif char in ['G', 'C']:
                     # Create the Goal slot.
-                    # It is modeled as a C-shaped pocket opening to the left (-X direction).
-                    # It comprises three wall-like geoms (back, top, and bottom) within a single body.
+                    # It is modeled as a tight C-shaped pocket opening to the left (-X direction).
                     goal = ET.SubElement(worldbody, 'body', {
                         'name': 'goal_pocket',
                         'pos': f'{x} {y} 0.05'
                     })
                     
-                    half_w = self.cell_size / 2.0
-                    thickness = 0.02
-                    half_thickness = thickness / 2.0
+                    # Inner width = 0.09m (half: 0.045m, 1.5x agent width), Inner depth = 0.11m (half: 0.055m)
+                    # Wall thickness = 0.01m (half: 0.005m)
+                    wall_t = 0.005
+                    inner_h = 0.045
+                    inner_d = 0.055
                     
                     # 1. Back wall (closing the pocket on the right side)
                     ET.SubElement(goal, 'geom', {
                         'name': 'goal_back_geom',
                         'type': 'box',
-                        'pos': f'{half_w - half_thickness} 0 0',
-                        'size': f'{half_thickness} {half_w} 0.05',
+                        'pos': '0.095 0 0',
+                        'size': f'{wall_t} 0.05 0.05',
                         'rgba': '0.1 0.7 0.2 0.6',
                         'condim': '3'
                     })
@@ -174,8 +204,8 @@ class MazeModel:
                     ET.SubElement(goal, 'geom', {
                         'name': 'goal_top_geom',
                         'type': 'box',
-                        'pos': f'{-half_thickness} {half_w - half_thickness} 0',
-                        'size': f'{half_w - half_thickness} {half_thickness} 0.05',
+                        'pos': '0.035 0.05 0',
+                        'size': f'{inner_d} {wall_t} 0.05',
                         'rgba': '0.1 0.7 0.2 0.6',
                         'condim': '3'
                     })
@@ -184,8 +214,8 @@ class MazeModel:
                     ET.SubElement(goal, 'geom', {
                         'name': 'goal_bottom_geom',
                         'type': 'box',
-                        'pos': f'{-half_thickness} {-half_w + half_thickness} 0',
-                        'size': f'{half_w - half_thickness} {half_thickness} 0.05',
+                        'pos': '0.035 -0.05 0',
+                        'size': f'{inner_d} {wall_t} 0.05',
                         'rgba': '0.1 0.7 0.2 0.6',
                         'condim': '3'
                     })

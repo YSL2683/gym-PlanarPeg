@@ -20,7 +20,7 @@ class PlanarPegEnv(gym.Env):
         cell_size: float = 0.2,
         n_substeps: int = 25,
         render_mode: Optional[str] = None,
-        max_episode_steps: int = 200,
+        max_episode_steps: int = 500,
     ):
         """
         Initializes the environment.
@@ -38,11 +38,11 @@ class PlanarPegEnv(gym.Env):
         if grid is None:
             grid = [
                 "WWWWWWWWWWWW",
-                "W....O.....W",
+                "W..........W",
                 "W....O.....W",
                 "W.S......C.W",
                 "W....O.....W",
-                "W....O.....W",
+                "W..........W",
                 "WWWWWWWWWWWW"
             ]
             
