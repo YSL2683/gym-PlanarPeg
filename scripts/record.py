@@ -62,6 +62,8 @@ def main():
         data.create_dataset('image_front', shape=(0, 224, 224, 3), chunks=(100, 224, 224, 3), dtype='uint8')
         data.create_dataset('proprioception', shape=(0, 3), chunks=(100, 3), dtype='float32')
         data.create_dataset('action', shape=(0, 3), chunks=(100, 3), dtype='float32')
+        data.create_dataset('reward', shape=(0,), chunks=(100,), dtype='float32')
+        data.create_dataset('terminated', shape=(0,), chunks=(100,), dtype='bool')
         meta = root.create_group('meta')
         meta.create_dataset('episode_ends', shape=(0,), chunks=(100,), dtype='int64')
         current_episodes = 0
@@ -88,8 +90,8 @@ def main():
     print("\n[INFO] Loading Gymnasium environment...")
     env = gym.make("PlanarPegInsertion-v0", render_mode="human")
     
-    move_speed = 0.04
-    rot_speed = 0.05
+    move_speed = 0.05
+    rot_speed = 0.15
     ema_alpha = 0.15
     clock = pygame.time.Clock()
     
@@ -97,28 +99,27 @@ def main():
     ep_images_front = []
     ep_proprioception = []
     ep_actions = []
+    ep_rewards = []
+    ep_terminated = []
     
     obs, info = env.reset()
-    raw_action = np.zeros(3, dtype=np.float32)
     agent_init_x, agent_init_y, agent_init_theta = obs["proprioception"]
-    raw_action[0] = agent_init_x / env.unwrapped.x_limit
-    raw_action[1] = agent_init_y / env.unwrapped.y_limit
-    raw_action[2] = agent_init_theta / np.pi
+    raw_action = np.array([agent_init_x, agent_init_y, agent_init_theta], dtype=np.float32)
     filtered_action = np.copy(raw_action)
     
     def reset_episode():
         nonlocal obs, info, raw_action, filtered_action
         obs, info = env.reset()
         agent_init_x, agent_init_y, agent_init_theta = obs["proprioception"]
-        raw_action[0] = agent_init_x / env.unwrapped.x_limit
-        raw_action[1] = agent_init_y / env.unwrapped.y_limit
-        raw_action[2] = agent_init_theta / np.pi
+        raw_action = np.array([agent_init_x, agent_init_y, agent_init_theta], dtype=np.float32)
         filtered_action = np.copy(raw_action)
         
         ep_images_top.clear()
         ep_images_front.clear()
         ep_proprioception.clear()
         ep_actions.clear()
+        ep_rewards.clear()
+        ep_terminated.clear()
 
     def save_episode():
         nonlocal current_episodes
@@ -129,6 +130,8 @@ def main():
         root['data/image_front'].append(np.array(ep_images_front, dtype=np.uint8))
         root['data/proprioception'].append(np.array(ep_proprioception, dtype=np.float32))
         root['data/action'].append(np.array(ep_actions, dtype=np.float32))
+        root['data/reward'].append(np.array(ep_rewards, dtype=np.float32))
+        root['data/terminated'].append(np.array(ep_terminated, dtype=bool))
         
         ep_len = len(ep_actions)
         if len(root['meta/episode_ends']) == 0:
@@ -194,13 +197,13 @@ def main():
             if keys[pygame.K_q]: dtheta = rot_speed
             elif keys[pygame.K_e]: dtheta = -rot_speed
             
-        raw_action[0] = np.clip(raw_action[0] + dx_global, -1.0, 1.0)
-        raw_action[1] = np.clip(raw_action[1] + dy_global, -1.0, 1.0)
-        raw_action[2] = np.clip(raw_action[2] + dtheta, -1.0, 1.0)
+        raw_action[0] = np.clip(raw_action[0] + dx_global, -env.unwrapped.x_limit, env.unwrapped.x_limit)
+        raw_action[1] = np.clip(raw_action[1] + dy_global, -env.unwrapped.y_limit, env.unwrapped.y_limit)
+        raw_action[2] = np.clip(raw_action[2] + dtheta, -np.pi, np.pi)
         
-        target_x = raw_action[0] * env.unwrapped.x_limit
-        target_y = raw_action[1] * env.unwrapped.y_limit
-        target_theta = raw_action[2] * np.pi
+        target_x = raw_action[0]
+        target_y = raw_action[1]
+        target_theta = raw_action[2]
         
         diff_x = target_x - agent_x
         diff_y = target_y - agent_y
@@ -216,9 +219,9 @@ def main():
         diff_theta = np.clip(diff_theta, -max_diff_theta, max_diff_theta)
         target_theta = agent_theta + diff_theta
         
-        raw_action[0] = np.clip(target_x / env.unwrapped.x_limit, -1.0, 1.0)
-        raw_action[1] = np.clip(target_y / env.unwrapped.y_limit, -1.0, 1.0)
-        raw_action[2] = np.clip(target_theta / np.pi, -1.0, 1.0)
+        raw_action[0] = np.clip(target_x, -env.unwrapped.x_limit, env.unwrapped.x_limit)
+        raw_action[1] = np.clip(target_y, -env.unwrapped.y_limit, env.unwrapped.y_limit)
+        raw_action[2] = np.clip(target_theta, -np.pi, np.pi)
         
         filtered_action = ema_alpha * raw_action + (1.0 - ema_alpha) * filtered_action
         step_action = np.copy(filtered_action)
@@ -229,6 +232,8 @@ def main():
         ep_images_front.append(obs["image_front"])
         ep_proprioception.append(obs["proprioception"])
         ep_actions.append(step_action)
+        ep_rewards.append(reward)
+        ep_terminated.append(terminated)
         
         obs = next_obs
         info = step_info

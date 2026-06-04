@@ -75,9 +75,11 @@ class PlanarPegEnv(gym.Env):
         self.y_limit = (self.maze_model.height * self.cell_size) / 2.0
         
         # Define Spaces
-        # Action space: X, Y, and Theta (Z-axis rotation) normalized to [-1, 1]
+        # Action space: X, Y, and Theta (Z-axis rotation) in absolute physical coordinates
         self.action_space = spaces.Box(
-            low=-1.0, high=1.0, shape=(3,), dtype=np.float32
+            low=np.array([-self.x_limit, -self.y_limit, -np.pi]),
+            high=np.array([self.x_limit, self.y_limit, np.pi]),
+            dtype=np.float32
         )
         
         # Observation space: top/front RGB views (224x224x3) + proprioception pose [X, Y, Theta]
@@ -163,10 +165,8 @@ class PlanarPegEnv(gym.Env):
         # Ensure action values are constrained
         action = np.clip(action, self.action_space.low, self.action_space.high)
         
-        # Map normal actions [-1, 1] to absolute physical coordinate scale
-        target_x = action[0] * self.x_limit
-        target_y = action[1] * self.y_limit
-        target_theta = action[2] * np.pi
+        # Actions are already absolute physical coordinates
+        target_x, target_y, target_theta = action
         
         # Apply the goal pose to the weld-constrained mocap body
         self.data.mocap_pos[self.mocap_id] = [target_x, target_y, 0.025]

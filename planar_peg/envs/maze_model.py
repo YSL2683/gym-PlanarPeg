@@ -178,18 +178,19 @@ class MazeModel:
                     })
                     
                     # Inner width = 0.077m (half: 0.0385m, medium clearance), Inner depth = 0.13m (half: 0.065m)
-                    # Wall thickness = 0.01m (half: 0.005m)
-                    wall_t = 0.005
+                    # Wall thickness originally 0.01m (half: 0.005m), now increased by 1.5x to 0.015m (half: 0.0075m)
+                    wall_t = 0.0075
                     inner_h = 0.0385
                     inner_d = 0.065
                     
                     wall_y_pos = inner_h + wall_t
                     
                     # 1. Back wall (closing the pocket on the right side)
+                    # Shifted X position from 0.095 to 0.0975 to keep the inner depth exactly the same as before
                     ET.SubElement(goal, 'geom', {
                         'name': 'goal_back_geom',
                         'type': 'box',
-                        'pos': '0.095 0 0',
+                        'pos': '0.0975 0 0',
                         'size': f'{wall_t} {wall_y_pos} 0.05',
                         'rgba': '0.1 0.7 0.2 0.6',
                         'condim': '3'

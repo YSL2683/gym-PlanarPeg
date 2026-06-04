@@ -47,8 +47,8 @@ def main():
     print(f"[INFO] This is PLAY mode. Data will NOT be saved. Use 'python scripts/record.py' to collect datasets.")
 
     # Control hyper-parameters
-    move_speed = 0.04
-    rot_speed = 0.05
+    move_speed = 0.05
+    rot_speed = 0.15
     ema_alpha = 0.15  # Exponential Moving Average smoothing factor
     
     # Frequency regulator (20Hz matches render_fps of the env)
@@ -67,21 +67,15 @@ def main():
     # Initialize target mocap action
     # Start target synchronized at the agent start position mapped back to [-1, 1]
     # Initialize target mocap action based on actual randomized spawn coordinates from reset
-    raw_action = np.zeros(3, dtype=np.float32)
     agent_init_x, agent_init_y, agent_init_theta = obs["proprioception"]
-    raw_action[0] = agent_init_x / env.unwrapped.x_limit
-    raw_action[1] = agent_init_y / env.unwrapped.y_limit
-    raw_action[2] = agent_init_theta / np.pi
-    
+    raw_action = np.array([agent_init_x, agent_init_y, agent_init_theta], dtype=np.float32)
     filtered_action = np.copy(raw_action)
     
     def reset_episode():
         nonlocal obs, info, raw_action, filtered_action
         obs, info = env.reset()
         agent_init_x, agent_init_y, agent_init_theta = obs["proprioception"]
-        raw_action[0] = agent_init_x / env.unwrapped.x_limit
-        raw_action[1] = agent_init_y / env.unwrapped.y_limit
-        raw_action[2] = agent_init_theta / np.pi
+        raw_action = np.array([agent_init_x, agent_init_y, agent_init_theta], dtype=np.float32)
         filtered_action = np.copy(raw_action)
         
         ep_images_top.clear()
@@ -173,15 +167,15 @@ def main():
             elif keys[pygame.K_e]: dtheta = -rot_speed     # E: Rotate CW
         
         # Accumulate input commands in target raw action buffer
-        raw_action[0] = np.clip(raw_action[0] + dx_global, -1.0, 1.0)
-        raw_action[1] = np.clip(raw_action[1] + dy_global, -1.0, 1.0)
-        raw_action[2] = np.clip(raw_action[2] + dtheta, -1.0, 1.0)
+        raw_action[0] = np.clip(raw_action[0] + dx_global, -env.unwrapped.x_limit, env.unwrapped.x_limit)
+        raw_action[1] = np.clip(raw_action[1] + dy_global, -env.unwrapped.y_limit, env.unwrapped.y_limit)
+        raw_action[2] = np.clip(raw_action[2] + dtheta, -np.pi, np.pi)
         
         # Limit distance between target mocap pose and actual agent physical position.
         # This resolves the control lag ("self-dragging" effect) while safely preventing structural wall penetration.
-        target_x = raw_action[0] * env.unwrapped.x_limit
-        target_y = raw_action[1] * env.unwrapped.y_limit
-        target_theta = raw_action[2] * np.pi
+        target_x = raw_action[0]
+        target_y = raw_action[1]
+        target_theta = raw_action[2]
         
         diff_x = target_x - agent_x
         diff_y = target_y - agent_y
@@ -200,9 +194,9 @@ def main():
         target_theta = agent_theta + diff_theta
         
         # Write back the safe clamped target coordinates into the raw action register
-        raw_action[0] = np.clip(target_x / env.unwrapped.x_limit, -1.0, 1.0)
-        raw_action[1] = np.clip(target_y / env.unwrapped.y_limit, -1.0, 1.0)
-        raw_action[2] = np.clip(target_theta / np.pi, -1.0, 1.0)
+        raw_action[0] = np.clip(target_x, -env.unwrapped.x_limit, env.unwrapped.x_limit)
+        raw_action[1] = np.clip(target_y, -env.unwrapped.y_limit, env.unwrapped.y_limit)
+        raw_action[2] = np.clip(target_theta, -np.pi, np.pi)
         
         # Smooth commands using Exponential Moving Average (EMA) to prevent structural jerks
         filtered_action = ema_alpha * raw_action + (1.0 - ema_alpha) * filtered_action
