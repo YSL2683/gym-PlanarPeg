@@ -12,6 +12,7 @@ setup(
         "mujoco>=3.0.0",
         "pygame>=2.1.0",  # Used for gamepad/keyboard teleoperation
         "h5py>=3.6.0",    # Used for demonstration data logging
+        "opencv-python",  # Used for visualization of demonstration data
     ],
     python_requires=">=3.10",
 )

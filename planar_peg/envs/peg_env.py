@@ -34,16 +34,18 @@ class PlanarPegEnv(gym.Env):
         """
         super().__init__()
         
-        # Default grid map: S (Start) on the left, G (Goal) on the right, obstacle wall in the middle
+        # Default grid map: 13x9 rectangular map
         if grid is None:
             grid = [
-                "WWWWWWWWWWWW",
-                "W....O.....W",
-                "W....O.....W",
-                "W.S......C.W",
-                "W....O.....W",
-                "W....O.....W",
-                "WWWWWWWWWWWW"
+                "WWWWWWWWWWWWW",
+                "W...........W",
+                "W...........W",
+                "W.....O.....W",
+                "W.S.......C.W",
+                "W.....O.....W",
+                "W...........W",
+                "W...........W",
+                "WWWWWWWWWWWWW"
             ]
             
         self.grid = grid
@@ -78,17 +80,17 @@ class PlanarPegEnv(gym.Env):
             low=-1.0, high=1.0, shape=(3,), dtype=np.float32
         )
         
-        # Observation space: top/front RGB views (84x84x3) + proprioception pose [X, Y, Theta]
+        # Observation space: top/front RGB views (224x224x3) + proprioception pose [X, Y, Theta]
         self.observation_space = spaces.Dict({
-            "image_top": spaces.Box(low=0, high=255, shape=(84, 84, 3), dtype=np.uint8),
-            "image_front": spaces.Box(low=0, high=255, shape=(84, 84, 3), dtype=np.uint8),
+            "image_top": spaces.Box(low=0, high=255, shape=(224, 224, 3), dtype=np.uint8),
+            "image_front": spaces.Box(low=0, high=255, shape=(224, 224, 3), dtype=np.uint8),
             "proprioception": spaces.Box(
                 low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32
             )
         })
         
         # Renderer for multi-view image observations
-        self.renderer = mujoco.Renderer(self.model, height=84, width=84)
+        self.renderer = mujoco.Renderer(self.model, height=224, width=224)
         
         # Lazy initialization for Passive Viewer
         self.viewer = None

@@ -141,31 +141,24 @@ class MazeModel:
                     half_w = self.cell_size / 2.0
                     
                     # Gap narrowing and wall connecting:
-                    # Dynamically calculate the Y size and position offsets to connect the two obstacles
-                    # directly to the outer boundary walls while leaving a precise 0.09m gap in the middle.
-                    size_y = half_w
-                    pos_y = 0.0
-                    
+                    # Connect the two obstacles directly to the outer boundary walls
+                    # while leaving a precise 0.09m gap in the middle, perfectly aligned with the Start/Goal axis.
+                    gap_y = self.start_pos[1]  # The Y coordinate of the gap
                     y_wall_top = self.y_offset - self.cell_size / 2.0
+                    y_wall_bottom = -self.y_offset + self.cell_size / 2.0
                     inner_gap_half = 0.045  # half of 0.09m gap (1.5x agent width)
                     
-                    if r < self.height // 2:  # Top obstacle
+                    if y > gap_y:  # Top obstacle
                         target_y_max = y_wall_top
-                        target_y_min = inner_gap_half
+                        target_y_min = gap_y + inner_gap_half
+                    else:  # Bottom obstacle
+                        target_y_max = gap_y - inner_gap_half
+                        target_y_min = y_wall_bottom
                         
-                        target_length = target_y_max - target_y_min
-                        size_y = target_length / 2.0
-                        world_center_y = (target_y_max + target_y_min) / 2.0
-                        pos_y = world_center_y - y
-                        
-                    elif r > self.height // 2:  # Bottom obstacle
-                        target_y_max = -inner_gap_half
-                        target_y_min = -y_wall_top
-                        
-                        target_length = target_y_max - target_y_min
-                        size_y = target_length / 2.0
-                        world_center_y = (target_y_max + target_y_min) / 2.0
-                        pos_y = world_center_y - y
+                    target_length = target_y_max - target_y_min
+                    size_y = target_length / 2.0
+                    world_center_y = (target_y_max + target_y_min) / 2.0
+                    pos_y = world_center_y - y
                         
                     ET.SubElement(obstacle, 'geom', {
                         'name': f'obstacle_geom_{r}_{c}',

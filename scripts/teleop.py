@@ -104,9 +104,11 @@ def main():
         
         # Save buffers in HDF5 format with image compression
         with h5py.File(filepath, 'w') as f:
-            f.create_dataset("image_top", data=np.array(ep_images_top, dtype=np.uint8), compression="gzip", chunks=True)
-            f.create_dataset("image_front", data=np.array(ep_images_front, dtype=np.uint8), compression="gzip", chunks=True)
-            f.create_dataset("proprioception", data=np.array(ep_proprioception, dtype=np.float32))
+            obs_group = f.create_group("obs")
+            obs_group.create_dataset("image_top", data=np.array(ep_images_top, dtype=np.uint8), compression="gzip", chunks=True)
+            obs_group.create_dataset("image_front", data=np.array(ep_images_front, dtype=np.uint8), compression="gzip", chunks=True)
+            obs_group.create_dataset("proprioception", data=np.array(ep_proprioception, dtype=np.float32))
+            
             f.create_dataset("action", data=np.array(ep_actions, dtype=np.float32))
             f.create_dataset("reward", data=np.array(ep_rewards, dtype=np.float32))
             f.create_dataset("terminated", data=np.array(ep_terminated, dtype=bool))

@@ -13,13 +13,13 @@
 
     <worldbody>
         <!-- Lighting -->
-        <light directional="true" diffuse="0.8 0.8 0.8" specular="0.2 0.2 0.2" pos="0 0 4" dir="0 0 -1"/>
+        <light pos="0 0 4.0" dir="0 0 -1" directional="false" diffuse="0.8 0.8 0.8"/>
         
         <!-- Floor -->
         <geom name="floor" type="plane" size="5 5 0.1" rgba="0.9 0.9 0.9 1" condim="3"/>
 
         <!-- Top-view Camera (Static in Worldbody) -->
-        <camera name="top" pos="0.0 0.0 1.5" fovy="50"/>
+        <camera name="top" pos="0.0 0.0 2.8" fovy="50"/>
 
         <!-- Mocap Target Body (Visual target for control, hidden from cameras) -->
         <body name="mocap" mocap="true" pos="0 0 0.025">
