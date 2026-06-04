@@ -298,6 +298,12 @@ class PlanarPegEnv(gym.Env):
             if self.viewer is None:
                 import mujoco.viewer
                 self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
+                
+                # Set default camera view to 'top' camera
+                top_cam_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_CAMERA, "top")
+                if top_cam_id >= 0:
+                    self.viewer.cam.type = mujoco.mjtCamera.mjCAMERA_FIXED
+                    self.viewer.cam.fixedcamid = top_cam_id
             self.viewer.sync()
             return None
             

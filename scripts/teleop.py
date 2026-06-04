@@ -28,9 +28,10 @@ def main():
         joystick.init()
         print(f"\n[INFO] Joystick detected: {joystick.get_name()}")
     else:
-        print("\n[INFO] No joystick detected. Using keyboard controls:")
-        print("  - W / S : Control local X-axis (Forward / Backward)")
-        print("  - A / D : Control Theta / Yaw (Counter-Clockwise / Clockwise)")
+        print("\n[INFO] No joystick detected. Using keyboard controls (Global Coordinates):")
+        print("  - W / S : Translate Up / Down (Global Y)")
+        print("  - A / D : Translate Left / Right (Global X)")
+        print("  - Q / E : Rotate CCW / CW (Theta)")
         print("  - SPACE : Manually save current episode demonstration")
         print("  - R     : Reset current episode without saving")
         print("  - ESC   : Exit program")
@@ -155,49 +156,46 @@ def main():
             
         # Get current physical pose of the agent
         agent_x, agent_y, agent_theta = obs["proprioception"]
-             # Local steering inputs relative to agent frame (+X is front, +Y is left)
-        dx_local, dy_local, dtheta = 0.0, 0.0, 0.0
+        # Global steering inputs
+        dx_global, dy_global, dtheta = 0.0, 0.0, 0.0
         
         # 3. Read Controller Input
         # 3.1. Joystick Axis control (Takes precedence if available)
         if joystick is not None:
-            # Read horizontal/vertical analog axes
-            joy_dx = joystick.get_axis(0)
-            joy_dy = -joystick.get_axis(1)  # Invert Y-axis standard conventions
+            # Read Left Stick (Translation)
+            joy_left_x = joystick.get_axis(0)
+            joy_left_y = -joystick.get_axis(1)
             
-            # Filter analog stick micro-drifts (Deadzone)
-            if abs(joy_dx) < 0.1: joy_dx = 0.0
-            if abs(joy_dy) < 0.1: joy_dy = 0.0
+            # Read Right Stick X (Rotation)
+            joy_right_x = joystick.get_axis(2) if joystick.get_numaxes() > 2 else 0.0
             
-            # Joystick: Y-axis controls forward/back (local X), X-axis controls yaw rotation (dtheta)
-            dx_local = joy_dy * move_speed
-            dtheta = -joy_dx * rot_speed
+            # Deadzone
+            if abs(joy_left_x) < 0.1: joy_left_x = 0.0
+            if abs(joy_left_y) < 0.1: joy_left_y = 0.0
+            if abs(joy_right_x) < 0.1: joy_right_x = 0.0
             
-            # Map L1/R1 bumpers (4 and 5) to auxiliary rotation
-            if joystick.get_button(4):
-                dtheta += rot_speed
-            elif joystick.get_button(5):
-                dtheta -= rot_speed
+            # Left Stick maps directly to Global X/Y
+            dx_global = joy_left_x * move_speed
+            dy_global = joy_left_y * move_speed
+            
+            # Right Stick or Bumpers for Rotation
+            dtheta = -joy_right_x * rot_speed
+            if joystick.get_button(4): dtheta += rot_speed
+            if joystick.get_button(5): dtheta -= rot_speed
                 
-        # 3.2. Keyboard Keyboard control
+        # 3.2. Keyboard control
         else:
-            # W/S controls local X (forward/backward)
-            if keys[pygame.K_w]:
-                dx_local = move_speed
-            elif keys[pygame.K_s]:
-                dx_local = -move_speed
+            # W/S controls Global Y (Up/Down on screen)
+            if keys[pygame.K_w]: dy_global = move_speed      # W: Up
+            elif keys[pygame.K_s]: dy_global = -move_speed   # S: Down
                 
-            # A/D controls Theta (left/right rotation)
-            if keys[pygame.K_a]:
-                dtheta = rot_speed     # A: rotate counter-clockwise (left)
-            elif keys[pygame.K_d]:
-                dtheta = -rot_speed    # D: rotate clockwise (right)
+            # A/D controls Global X (Left/Right on screen)
+            if keys[pygame.K_a]: dx_global = -move_speed     # A: Left
+            elif keys[pygame.K_d]: dx_global = move_speed    # D: Right
                 
-        # Rotate local command [dx_local, dy_local] to global coordinates using agent's current heading
-        cos_theta = np.cos(agent_theta)
-        sin_theta = np.sin(agent_theta)
-        dx_global = dx_local * cos_theta - dy_local * sin_theta
-        dy_global = dx_local * sin_theta + dy_local * cos_theta
+            # Q/E controls Theta (left/right rotation)
+            if keys[pygame.K_q]: dtheta = rot_speed        # Q: Rotate CCW
+            elif keys[pygame.K_e]: dtheta = -rot_speed     # E: Rotate CW
         
         # Accumulate input commands in target raw action buffer
         raw_action[0] = np.clip(raw_action[0] + dx_global, -1.0, 1.0)
