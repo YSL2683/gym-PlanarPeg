@@ -36,8 +36,8 @@
             <!-- Agent Visual & Collision Geometry -->
             <geom name="agent_geom" type="box" size="0.05 0.03 0.025" rgba="1.0 0.2 0.2 1" condim="3"/>
             
-            <!-- Front-view Camera (First Person View) -->
-            <camera name="front" pos="0.04 0 0" xyaxes="0 -1 0 0 0 1" fovy="70"/>
+            <!-- Front-view Camera (Mounted halfway to front, angled 20 deg down) -->
+            <camera name="front" pos="0.0 0 0.08" xyaxes="0 -1 0 0.342 0 0.940" fovy="70"/>
         </body>
     </worldbody>
 
