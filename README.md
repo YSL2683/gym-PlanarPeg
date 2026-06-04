@@ -1,105 +1,131 @@
 # gym-PlanarPeg
 
-A 2.5D physical simulation environment for planar peg insertion built using MuJoCo and Gymnasium. It is designed to verify out-of-distribution (OOD) to in-distribution (ID) generalization and collect high-quality human demonstrations via teleoperation.
+MuJoCo와 Gymnasium을 기반으로 구축된 평면 쐐기 삽입(Planar Peg Insertion)을 위한 2.5D 물리 시뮬레이션 환경입니다. 본 환경은 분포 외(OOD, Out-Of-Distribution) 환경에서 분포 내(ID, In-Distribution) 환경으로의 일반화 성능 검증 및 텔레오퍼레이션(원격 조종)을 통한 고품질 사람 시연 데이터 수집을 목적으로 설계되었습니다.
 
-## Installation
-Set up the Conda workspace and package:
+## 개요
+본 환경의 태스크는 가상의 모캡(Mocap) 타겟에 weld 제약 조건으로 묶인 3-DoF 직사각형 peg(에이전트)를 조종하여, 격자형 미로 내 좁은 장애물 틈새(Gap)를 통과한 뒤 반대편에 위치한 C자형 골 박스(Goal Box)에 도킹하는 것입니다.
 
-```bash
-# Clone the repository
-git clone https://github.com/YSL2683/gym-PlanarPeg.git
-cd gym-PlanarPeg
-
-# Create and activate Conda environment
-conda create -n planar_peg python=3.10 -y
-conda activate planar_peg
-
-# Install the package in editable mode (auto-installs MuJoCo, gymnasium-robotics, Pygame, H5Py)
-pip install -e .
-```
-
-## Description
-The task in this environment is for a 3-DoF rectangular peg (agent), which is weld-constrained to a virtual mocap target, to safely navigate through a narrow barrier gap in a grid-like maze and dock into a C-shaped goal slot located on the opposite side. 
-
-While the simulation runs in a 3D MuJoCo physics engine, the agent's motion is physically constrained to a 2D plane ($X, Y, \Theta$) via slide and hinge joints. The goal slot is visualized as a green C-shaped structure opening to the left, while the agent is a light blue rectangular block.
+시뮬레이션은 MuJoCo 3D 물리 엔진을 기반으로 실행되지만, 에이전트의 물리적 움직임은 슬라이드(Slide, 병진) 및 힌지(Hinge, 회전) 조인트를 통해 2D 평면($X, Y, \theta$) 상으로 완벽히 구속됩니다. 골 박스는 왼쪽이 뚫려 있는 녹색 C자형 구조로 렌더링되며, 에이전트는 하늘색 직사각형 블록으로 표시됩니다.
 
 ---
 
-## Maze Layout & Variations
-The maze map is encoded discretely using a 2D text grid (list of strings). The cell encoding contains 5 core symbols:
-* `W` or `#`: **Boundary Wall** (rendered in gray: `rgba="0.3 0.3 0.3 1.0"`)
-* `O`: **Obstacle Wall** (rendered in blue: `rgba="0.2 0.4 0.8 1.0"`)
-* `S` or `P`: **Agent Reset Location** (Start position)
-* `C` or `G`: **C-shaped Goal Slot** (opens to the left)
-* `.`: **Empty Space**
+## 미로 레이아웃 및 구성
+미로 지도는 2D 텍스트 격자(문자열 리스트) 형태로 표현됩니다. 격자 인코딩에는 5가지 핵심 기호가 사용됩니다:
+* `W` 또는 `#`: **외곽 경계 벽** (회색 렌더링: `rgba="0.3 0.3 0.3 1.0"`)
+* `O`: **내부 장애물 벽** (파란색 렌더링: `rgba="0.2 0.4 0.8 1.0"`)
+* `S` 또는 `P`: **에이전트 스폰 위치** (시작 위치)
+* `C` 또는 `G`: **C자형 골 박스** (왼쪽으로 열린 형태)
+* `.`: **빈 공간**
 
-### Default Layout (12x7 Grid)
-The default configuration creates a vertical barrier in the middle with a single central gap at row index 3. The agent spawns on the far left, and the C-shaped goal is centered on the far right:
+### 기본 레이아웃 (12x7 격자)
+기본 설정은 맵 중앙(5열)에 벽까지 이어진 파란색 장벽을 배치하고, 세로 중앙 위치인 3행에 단 하나의 통과 구멍(틈새)을 제공하는 레이아웃입니다. 에이전트는 극서쪽(왼쪽)에 스폰되고, C자형 골 슬롯은 극동쪽(오른쪽)의 세로 중앙에 위치합니다:
 ```python
 grid = [
     "WWWWWWWWWWWW",
-    "W....O.....W",  # Top barrier (blue)
     "W....O.....W",
-    "W.S......C.W",  # Start (S) on left, Goal (C) on right, Gap in middle
     "W....O.....W",
-    "W....O.....W",  # Bottom barrier (blue)
+    "W.S......C.W",
+    "W....O.....W",
+    "W....O.....W",
     "WWWWWWWWWWWW"
 ]
 ```
 
 ---
 
-## Action Space
-The action space is a `Box(-1.0, 1.0, (3,), float32)`. The elements represent the normalized absolute target coordinates for the virtual mocap control body:
+## 액션 공간 (Action Space)
+액션 공간은 `Box(-1.0, 1.0, (3,), float32)`입니다. 각 원소는 가상 모캡(Mocap) 제어 바디의 정규화된 절대 타겟 포즈를 의미합니다:
 
-| Num | Action | Control Min | Control Max | Mapping Target (Physical Scale) |
+| 번호 | 액션 | 제어 최소값 | 제어 최대값 | 매핑 대상 (실제 물리 스케일) |
 | :--- | :--- | :---: | :---: | :--- |
-| **0** | Absolute X Coordinate | -1.0 | 1.0 | $[-x\_limit, x\_limit]$ meters |
-| **1** | Absolute Y Coordinate | -1.0 | 1.0 | $[-y\_limit, y\_limit]$ meters |
-| **2** | Absolute Theta (Yaw) | -1.0 | 1.0 | $[-\pi, \pi]$ radians |
+| **0** | 절대 X 좌표 | -1.0 | 1.0 | $[-x\_limit, x\_limit]$ 미터 |
+| **1** | 절대 Y 좌표 | -1.0 | 1.0 | $[-y\_limit, y\_limit]$ 미터 |
+| **2** | 절대 회전각 (Yaw) | -1.0 | 1.0 | $[-\pi, \pi]$ 라디안 |
 
 ---
 
-## Observation Space
-The observation space is a goal-aware dictionary consisting of 3 keys:
-* `image_top`: Top-down static RGB viewpoint rendering of the entire maze (`Box(0, 255, (84, 84, 3), dtype=np.uint8)`).
-* `image_front`: First-person forward-looking RGB viewpoint rendering attached to the front face of the rectangular peg (`Box(0, 255, (84, 84, 3), dtype=np.uint8)`).
-* `proprioception`: 3-dimensional kinematic array of the actual rectangular peg's absolute world pose (`Box(-inf, inf, (3,), dtype=np.float32)`):
+## 관측 공간 (Observation Space)
+관측 공간은 에이전트의 상태 및 목표 지점 정보를 담은 목표 지향형(Goal-aware) 딕셔너리로 구성되며, 다음 3가지 키를 포함합니다:
+* `image_top`: 미로 전체를 위에서 내려다보는 탑뷰 RGB 이미지 (`Box(0, 255, (84, 84, 3), dtype=np.uint8)`).
+* `image_front`: 직사각형 에이전트의 전면부에 부착되어 전방을 바라보는 1인칭 전방 뷰 RGB 이미지 (`Box(0, 255, (84, 84, 3), dtype=np.uint8)`).
+* `proprioception`: 직사각형 에이전트의 실제 월드 절대 포즈를 나타내는 3차원 상태 배열 (`Box(-inf, inf, (3,), dtype=np.float32)`):
 
-| Top-view (`image_top`) | Front-view (`image_front`) |
+| 탑뷰 (`image_top`) | 전방뷰 (`image_front`) |
 | :---: | :---: |
-| ![Top-view](media/top_view_image.png) | ![Front-view](media/front_view_image.png) |
+| ![탑뷰](media/top_view_image.png) | ![전방뷰](media/front_view_image.png) |
 
-| Num | Observation | Min | Max | Unit | Description |
+| 번호 | 관측 정보 | 최소값 | 최대값 | 단위 | 설명 |
 | :--- | :--- | :---: | :---: | :---: | :--- |
-| **0** | Peg X Coordinate | -Inf | Inf | meters | Absolute world position along X axis |
-| **1** | Peg Y Coordinate | -Inf | Inf | meters | Absolute world position along Y axis |
-| **2** | Peg Yaw ($\Theta$) | -Inf | Inf | radians | Absolute rotation around Z axis |
+| **0** | 에이전트 X 좌표 | -Inf | Inf | 미터 (m) | 월드 좌표계 기준 절대 X축 위치 |
+| **1** | 에이전트 Y 좌표 | -Inf | Inf | 미터 (m) | 월드 좌표계 기준 절대 Y축 위치 |
+| **2** | 에이전트 Yaw각 ($\theta$) | -Inf | Inf | 라디안 (rad) | Z축 기준 절대 회전 각도 |
 
 ---
 
-## Rewards
-* **Success (Sparse):** When the agent successfully docks parallel inside the goal slot, a reward of **`+1.0`** is returned, and the episode terminates.
-  * **Success Criteria**: 
-    1. The agent is considered successfully docked when **all 4 corners of its rectangular body** are strictly inside the goal pocket boundary.
-    2. *Goal boundaries:* $X \in [gx - 0.04, gx + 0.09]$ (depth: $0.13\text{m}$), $Y \in [gy - 0.045, gy + 0.045]$ (width: $0.09\text{m}$).
-    3. This ensures the peg is fully parallel and entirely inside the pocket without structural collision.
-* **Time Penalty:** To encourage efficiency, a small time cost penalty of **`-0.01`** is applied at every step until docking is achieved.
+## 보상 체계 (Rewards)
+* **도킹 성공 보상 (Sparse):** 에이전트가 골 박스 내부에 물리 충돌 없이 완벽히 평행을 유지하며 진입했을 때 **`+1.0`** 보상이 지급되고 에피소드가 성공적으로 종료됩니다.
+  * **성공 판정 기준 (Success Criteria)**: 
+    1. 에이전트 직사각형 바디의 **4개 코너 꼭짓점 모두**가 골 박스의 내부 범위 안에 완전히 포함될 때 성공으로 인정합니다.
+    2. *골 박스 내부 범위:* $X \in [gx - 0.04, gx + 0.09]$ (가로 깊이: $0.13\text{m}$), $Y \in [gy - 0.045, gy + 0.045]$ (세로 너비: $0.09\text{m}$).
+    3. 이 조건은 에이전트가 비뚤어지거나 걸침 현상 없이 완전히 수납 영역 내에 평행하게 주차되었음을 기하학적으로 엄격히 보장합니다.
+* **타임 페널티 (Time Penalty):** 에이전트가 보다 신속하게 도킹 태스크를 완수하도록 유도하기 위해, 도킹에 성공하기 전까지 매 step마다 **`-0.01`**의 시간 비용 감점 보상이 가해집니다.
 
 ---
 
-## Starting State
-When the environment is reset:
-1. The discrete start cell `S` is converted into continuous Cartesian $(x,y)$ coordinates.
-2. A uniform random spatial noise within range **`[-0.05, 0.05]` meters** is added to the starting coordinates.
-3. A uniform random angular noise within range **`[-10.0°, 10.0°]`** ($[-0.174, 0.174]\text{rad}$) is added to the starting orientation.
-4. The control Mocap target body is automatically snapped and synchronized to this randomized spawn pose.
+## 시작 상태 (Starting State)
+에피소드가 리셋(reset)될 때마다 다음 규칙에 따라 에이전트가 배치됩니다:
+1. 격자 맵 상에 지정된 시작 셀 `S`가 시뮬레이션의 Cartesian $(x,y)$ 좌표로 변환됩니다.
+2. 에이전트의 초기 좌표에 **`[-0.05, 0.05]` 미터** 범위의 균등 분포에서 샘플링된 무작위 위치 노이즈가 추가됩니다.
+3. 초기 방향(Yaw)에 **`[-10.0°, 10.0°]`** ($[-0.174, 0.174]\text{rad}$) 범위의 균등 분포에서 샘플링된 무작위 각도 노이즈가 추가됩니다.
+4. 조종용 모캡(Mocap) 타겟 바디는 리셋 직후 이 무작위화된 스폰 포즈와 완벽하게 동기화(Sync)되어 튀는 현상을 방지합니다.
 
 ---
 
-## Episode End
-* **terminated:** True when the peg reaches the docking success threshold inside the C-shaped goal.
-* **truncated:** True when the elapsed steps reach `max_episode_steps` (default: `200`).
+## 에피소드 종료 조건 (Episode End)
+* **terminated (성공 종료):** 에이전트의 바디가 C자형 골 박스 내부에 완전히 수납되어 성공 판정을 받았을 때 `True`가 됩니다.
+* **truncated (시간 초과 중단):** 현재 스텝 수가 에피소드 제한 규격인 `max_episode_steps` (기본값: `300`)에 도달했을 때 `True`가 됩니다.
 
 ---
 
+## 설치 방법 (Installation)
+Conda 작업 공간을 구성하고 패키지를 설치하려면 아래 명령어를 사용하십시오:
+
+```bash
+# 저장소 복제
+git clone https://github.com/YSL2683/gym-PlanarPeg.git
+cd gym-PlanarPeg
+
+# Conda 가상환경 생성 및 활성화
+conda create -n planar_peg python=3.10 -y
+conda activate planar_peg
+
+# 패키지를 개발자(Editable) 모드로 설치 (MuJoCo, gymnasium-robotics, Pygame, H5Py 자동 설치)
+pip install -e .
+```
+
+---
+
+## 사용 방법 (Usage)
+
+### 1. 환경 등록 및 설치 검증
+Gymnasium 레지스트리에 패키지가 정상적으로 연동되어 인스턴스를 생성할 수 있는지 테스트합니다:
+```bash
+python -c "import gymnasium as gym; import planar_peg; env = gym.make('PlanarPegInsertion-v0'); print('Successfully created:', env.spec.id)"
+```
+
+### 2. 시연 데이터 수집 (원격 조종)
+**키보드** 또는 연결된 **조이스틱 게임패드**를 사용하여 에이전트를 실시간으로 정밀 조작하며 고품질 경로 데이터를 수집할 수 있습니다:
+```bash
+python scripts/teleop.py
+```
+
+* **키보드 조작 단축키**:
+  * `W` / `S`: 에이전트 로컬 전방 뷰 기준 **전진 / 후진** (에이전트 방향 기준 X축 이동)
+  * `A` / `D`: 에이전트 기준 **반시계방향(좌) / 시계방향(우) 회전** (Yaw각 스핀)
+  * `SPACE`: 현재 수집된 경로 버퍼를 데이터 파일로 수동 저장
+  * `R`: 수집 데이터를 저장하지 않고 현재 에피소드를 강제 리셋
+  * `ESC`: 원격 조종 패널 및 시뮬레이터 프로그램 종료
+* **수집 데이터 로그 포맷**:
+  * 골 도킹에 성공하면 궤적 데이터가 `data/` 폴더 내에 gzip으로 압축된 `.hdf5` 파일로 자동 기록됩니다.
+  * 데이터셋에는 `image_top`, `image_front`, `proprioception`, `action`, `reward`, `terminated` 등이 에피소드 단위로 로깅됩니다.
+  * **거리 및 회전 기반 클램핑(Distance/Rotation-based Clamping)**이 기본 활성화되어 있어 모캡 타겟의 오차가 에이전트로부터 최대 `0.08m` 및 `30도`를 초과하지 못합니다. 따라서 사용자가 무리하게 벽 너머로 조작을 가하더라도 에이전트가 장애물을 뚫고 지나가지 못하고 현실적인 충돌 역학을 보여줍니다.

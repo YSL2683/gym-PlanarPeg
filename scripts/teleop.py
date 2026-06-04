@@ -29,9 +29,8 @@ def main():
         print(f"\n[INFO] Joystick detected: {joystick.get_name()}")
     else:
         print("\n[INFO] No joystick detected. Using keyboard controls:")
-        print("  - W / S : Control Y-axis (Up / Down in top view)")
-        print("  - A / D : Control X-axis (Left / Right in top view)")
-        print("  - Q / E : Control Theta / Yaw (Counter-Clockwise / Clockwise)")
+        print("  - W / S : Control local X-axis (Forward / Backward)")
+        print("  - A / D : Control Theta / Yaw (Counter-Clockwise / Clockwise)")
         print("  - SPACE : Manually save current episode demonstration")
         print("  - R     : Reset current episode without saving")
         print("  - ESC   : Exit program")

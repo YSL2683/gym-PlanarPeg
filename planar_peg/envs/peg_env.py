@@ -20,7 +20,7 @@ class PlanarPegEnv(gym.Env):
         cell_size: float = 0.2,
         n_substeps: int = 25,
         render_mode: Optional[str] = None,
-        max_episode_steps: int = 1000,
+        max_episode_steps: int = 300,
     ):
         """
         Initializes the environment.
