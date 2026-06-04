@@ -68,7 +68,7 @@ def draw_cv2_plot(proprio, actions, current_step, width, height):
 def main():
     parser = argparse.ArgumentParser(description="View saved HDF5 demonstrations (Pure OpenCV).")
     parser.add_argument("--file", type=str, required=True, help="Path to the .hdf5 demo file")
-    parser.add_argument("--fps", type=int, default=20, help="Playback FPS (default: 20)")
+    parser.add_argument("--fps", type=int, default=10, help="Playback FPS (default: 10)")
     parser.add_argument("--scale", type=int, default=2, help="Image upscale factor (default: 2)")
     args = parser.parse_args()
 
@@ -127,7 +127,7 @@ def main():
             img_combined = np.hstack((top_bgr, front_bgr))
             
             # 4. Generate Plot using custom OpenCV drawing
-            plot_height = 200
+            plot_height = 400
             plot_width = img_combined.shape[1]
             plot_img = draw_cv2_plot(proprio, actions, i, plot_width, plot_height)
             

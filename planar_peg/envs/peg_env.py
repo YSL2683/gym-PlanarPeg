@@ -12,15 +12,15 @@ class PlanarPegEnv(gym.Env):
     The agent is a rectangular peg constrained to move in a 2D plane (X, Y, Theta).
     Impedance-like control is realized via a weld-constrained mocap body.
     """
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 20}
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 10}
 
     def __init__(
         self,
         grid: Optional[list] = None,
         cell_size: float = 0.2,
-        n_substeps: int = 25,
+        n_substeps: int = 50,
         render_mode: Optional[str] = None,
-        max_episode_steps: int = 300,
+        max_episode_steps: int = 150,
     ):
         """
         Initializes the environment.
@@ -34,18 +34,18 @@ class PlanarPegEnv(gym.Env):
         """
         super().__init__()
         
-        # Default grid map: 13x9 rectangular map
+        # Default grid map: 11x9 rectangular map
         if grid is None:
             grid = [
-                "WWWWWWWWWWWWW",
-                "W...........W",
-                "W...........W",
-                "W.....O.....W",
-                "W.S.......C.W",
-                "W.....O.....W",
-                "W...........W",
-                "W...........W",
-                "WWWWWWWWWWWWW"
+                "WWWWWWWWWWW",
+                "W.........W",
+                "W.........W",
+                "W....O....W",
+                "W.S.....C.W",
+                "W....O....W",
+                "W.........W",
+                "W.........W",
+                "WWWWWWWWWWW"
             ]
             
         self.grid = grid
