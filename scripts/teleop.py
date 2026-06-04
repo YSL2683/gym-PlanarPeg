@@ -5,7 +5,6 @@ import datetime
 import argparse
 import numpy as np
 import gymnasium as gym
-import h5py
 import pygame
 
 # Add project root to path to ensure package resolution works cleanly
@@ -37,8 +36,7 @@ def main():
         print("  - W / S : Translate Up / Down (Global Y)")
         print("  - A / D : Translate Left / Right (Global X)")
         print("  - Q / E : Rotate CCW / CW (Theta)")
-        print("  - SPACE : Manually save current episode demonstration")
-        print("  - R     : Reset current episode without saving")
+        print("  - R     : Reset current episode manually")
         print("  - ESC   : Exit program")
 
     # 2. Instantiate the Gymnasium environment in human rendering mode
@@ -46,11 +44,7 @@ def main():
     print("\n[INFO] Loading Gymnasium environment 'PlanarPegInsertion-v0'...")
     env = gym.make("PlanarPegInsertion-v0", render_mode="human")
     
-    # Save folder for demonstrations
-    base_save_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
-    save_dir = os.path.join(base_save_dir, args.task)
-    os.makedirs(save_dir, exist_ok=True)
-    print(f"[INFO] HDF5 demonstrations will save to: {save_dir}")
+    print(f"[INFO] This is PLAY mode. Data will NOT be saved. Use 'python scripts/record.py' to collect datasets.")
 
     # Control hyper-parameters
     move_speed = 0.04
@@ -99,32 +93,7 @@ def main():
         print("[INFO] Episode reset successfully.")
 
     def save_episode(success: bool = False):
-        if len(ep_actions) == 0:
-            print("[WARNING] Buffer empty, skipping save.")
-            return
-            
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        status = "success" if success else "failed"
-        filename = f"{args.task}_{timestamp}_{status}.hdf5"
-        filepath = os.path.join(save_dir, filename)
-        
-        # Save buffers in HDF5 format with image compression
-        with h5py.File(filepath, 'w') as f:
-            obs_group = f.create_group("obs")
-            obs_group.create_dataset("image_top", data=np.array(ep_images_top, dtype=np.uint8), compression="gzip", chunks=True)
-            obs_group.create_dataset("image_front", data=np.array(ep_images_front, dtype=np.uint8), compression="gzip", chunks=True)
-            obs_group.create_dataset("proprioception", data=np.array(ep_proprioception, dtype=np.float32))
-            
-            f.create_dataset("action", data=np.array(ep_actions, dtype=np.float32))
-            f.create_dataset("reward", data=np.array(ep_rewards, dtype=np.float32))
-            f.create_dataset("terminated", data=np.array(ep_terminated, dtype=bool))
-            
-            # Save metadata attributes
-            f.attrs["success"] = success
-            f.attrs["steps"] = len(ep_actions)
-            f.attrs["grid"] = env.unwrapped.grid
-            
-        print(f"[SUCCESS] Saved demonstration: {filepath} (Steps: {len(ep_actions)}, Success: {success})")
+        print(f"\n🎉 [SUCCESS] Goal Reached! (Note: Play mode does not save data. Run record.py for saving.)")
         reset_episode()
 
     running = True
@@ -156,8 +125,6 @@ def main():
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
                     reset_episode()
-                elif event.key == pygame.K_SPACE:
-                    save_episode(success=info.get("success", False))
                     
         if not running:
             break
@@ -260,8 +227,8 @@ def main():
             print("\n[SUCCESS] Insertion complete! Goal pocket docked.")
             save_episode(success=True)
         elif truncated:
-            print("\n[INFO] Episode limit reached.")
-            reset_episode()
+            # We ignore truncation in play mode to allow infinite free play
+            pass
             
     env.close()
     pygame.quit()

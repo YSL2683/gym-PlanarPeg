@@ -13,6 +13,7 @@ setup(
         "pygame>=2.1.0",  # Used for gamepad/keyboard teleoperation
         "h5py>=3.6.0",    # Used for demonstration data logging
         "opencv-python",  # Used for visualization of demonstration data
+        "zarr",          # Used for efficient storage of demonstration data (alternative to HDF5)
     ],
     python_requires=">=3.10",
 )
