@@ -50,9 +50,9 @@ grid = [
 * `image_front`: 직사각형 에이전트의 전면부에 부착되어 전방을 바라보는 1인칭 전방 뷰 RGB 이미지 (`Box(0, 255, (84, 84, 3), dtype=np.uint8)`).
 * `proprioception`: 직사각형 에이전트의 실제 월드 절대 포즈를 나타내는 3차원 상태 배열 (`Box(-inf, inf, (3,), dtype=np.float32)`):
 
-| 탑뷰 (`image_top`) | 전방뷰 (`image_front`) |
+| Top View Image (`image_top`) | Front View Image (`image_front`) |
 | :---: | :---: |
-| ![탑뷰](media/top_view_image.png) | ![전방뷰](media/front_view_image.png) |
+| ![Top View Image](media/top_view_image.png) | ![Front View Image](media/front_view_image.png) |
 
 | 번호 | 관측 정보 | 최소값 | 최대값 | 단위 | 설명 |
 | :--- | :--- | :---: | :---: | :---: | :--- |
