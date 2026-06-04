@@ -20,7 +20,7 @@ class PlanarPegEnv(gym.Env):
         cell_size: float = 0.2,
         n_substeps: int = 50,
         render_mode: Optional[str] = None,
-        max_episode_steps: int = 150,
+        max_episode_steps: int = 250,
     ):
         """
         Initializes the environment.
@@ -125,46 +125,28 @@ class PlanarPegEnv(gym.Env):
 
     def _check_success(self, x: float, y: float, theta: float) -> bool:
         """
-        Evaluates whether the agent's body is fully inside the C-shaped goal pocket.
-        Determined by checking if all 4 corners of the rectangular agent are inside
-        the boundaries of the goal pocket.
+        Evaluates whether the agent is fully inside the C-shaped goal pocket.
+        Since the pocket is narrow, we only need to check if the agent's center
+        is deep enough inside the pocket.
         """
         gx, gy = self.current_goal_pos
         g_theta = self.current_goal_theta
         
-        # Agent size: half-width = 0.05m (X-axis), half-height = 0.03m (Y-axis)
-        half_w = 0.05
-        half_h = 0.03
-        
-        # 4 corner coordinates in agent local frame
-        corners_local = [
-            [half_w, half_h],
-            [half_w, -half_h],
-            [-half_w, half_h],
-            [-half_w, -half_h]
-        ]
-        
-        cos_t = np.cos(theta)
-        sin_t = np.sin(theta)
         g_cos = np.cos(g_theta)
         g_sin = np.sin(g_theta)
         
-        for cx, cy in corners_local:
-            # Transform to world coordinates
-            wx = x + cx * cos_t - cy * sin_t
-            wy = y + cx * sin_t + cy * cos_t
+        # Transform agent center (world) to goal pocket local frame
+        dx_world = x - gx
+        dy_world = y - gy
+        lx = dx_world * g_cos + dy_world * g_sin
+        ly = -dx_world * g_sin + dy_world * g_cos
+        
+        # The agent's half-width is 0.05. The pocket opens from lx=-0.04 and ends at lx=0.09.
+        # If the center lx is >= 0.02, the agent is securely docked inside.
+        if 0.02 <= lx <= 0.09 and -0.03 <= ly <= 0.03:
+            return True
             
-            # Transform world to goal pocket local frame
-            dx_world = wx - gx
-            dy_world = wy - gy
-            lx = dx_world * g_cos + dy_world * g_sin
-            ly = -dx_world * g_sin + dy_world * g_cos
-            
-            # Inner depth = 0.13m (opens left at -0.04), Inner width = 0.077m
-            if not (-0.04 <= lx <= 0.09 and -0.0385 <= ly <= 0.0385):
-                return False
-                
-        return True
+        return False
         
     def step(self, action: np.ndarray) -> Tuple[Dict[str, np.ndarray], float, bool, bool, Dict[str, Any]]:
         """

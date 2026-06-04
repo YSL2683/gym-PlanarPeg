@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import datetime
+import argparse
 import numpy as np
 import gymnasium as gym
 import h5py
@@ -13,6 +14,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import planar_peg
 
 def main():
+    parser = argparse.ArgumentParser(description="Teleoperate Planar Peg")
+    parser.add_argument("--task", type=str, default="ID_base", help="Task name for data organization")
+    args = parser.parse_args()
+    
     # 1. Initialize Pygame (for keyboard and joystick event reading)
     pygame.init()
     pygame.joystick.init()
@@ -42,7 +47,8 @@ def main():
     env = gym.make("PlanarPegInsertion-v0", render_mode="human")
     
     # Save folder for demonstrations
-    save_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+    base_save_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+    save_dir = os.path.join(base_save_dir, args.task)
     os.makedirs(save_dir, exist_ok=True)
     print(f"[INFO] HDF5 demonstrations will save to: {save_dir}")
 
@@ -99,7 +105,7 @@ def main():
             
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         status = "success" if success else "failed"
-        filename = f"demo_{timestamp}_{status}.hdf5"
+        filename = f"{args.task}_{timestamp}_{status}.hdf5"
         filepath = os.path.join(save_dir, filename)
         
         # Save buffers in HDF5 format with image compression
