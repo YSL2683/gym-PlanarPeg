@@ -127,5 +127,33 @@ python scripts/teleop.py
   * `ESC`: 원격 조종 패널 및 시뮬레이터 프로그램 종료
 * **수집 데이터 로그 포맷**:
   * 골 도킹에 성공하면 궤적 데이터가 `data/` 폴더 내에 gzip으로 압축된 `.hdf5` 파일로 자동 기록됩니다.
-  * 데이터셋에는 `image_top`, `image_front`, `proprioception`, `action`, `reward`, `terminated` 등이 에피소드 단위로 로깅됩니다.
+  * 데이터셋 세부 규격은 아래의 **데이터 저장 형식** 세션을 참고하십시오.
   * **거리 및 회전 기반 클램핑(Distance/Rotation-based Clamping)**이 기본 활성화되어 있어 모캡 타겟의 오차가 에이전트로부터 최대 `0.08m` 및 `30도`를 초과하지 못합니다. 따라서 사용자가 무리하게 벽 너머로 조작을 가하더라도 에이전트가 장애물을 뚫고 지나가지 못하고 현실적인 충돌 역학을 보여줍니다.
+
+---
+
+## 데이터 저장 형식 (Data Storage Format)
+
+수집된 사람 시연 데이터(Demonstration Data)는 `data/` 디렉토리에 `demo_[Timestamp]_[Status].hdf5` 형식의 파일로 저장됩니다. HDF5 파일은 에피소드 단위의 시계열 데이터를 포함하며, 이미지 데이터의 용량을 최적화하기 위해 `gzip` 압축 및 청크(Chunk) 처리가 적용되어 있습니다.
+
+### 1. 데이터셋 구조 (Datasets)
+
+각 HDF5 파일은 궤적 길이($N$) 동안 매 step 수집된 다음 데이터셋들로 구성됩니다:
+
+| 데이터셋 이름 | 차원 (Shape) | 데이터 타입 (Dtype) | 설명 |
+| :--- | :--- | :---: | :--- |
+| `image_top` | $(N, 84, 84, 3)$ | `uint8` | 탑뷰(Top-view) RGB 이미지 관측값. (Gzip 압축 적용) |
+| `image_front` | $(N, 84, 84, 3)$ | `uint8` | 에이전트 전면에 장착된 1인칭 전방뷰 RGB 이미지 관측값. (Gzip 압축 적용) |
+| `proprioception` | $(N, 3)$ | `float32` | 에이전트의 실제 3-DoF 물리 상태 `[X, Y, Theta]`. ($X, Y$: 절대 월드 좌표 미터 단위, $Theta$: Z축 기준 절대 라디안 각도 $[-\pi, \pi]$) |
+| `action` | $(N, 3)$ | `float32` | 제어용 가상 모캡(Mocap) 타겟의 normalized 입력 액션 `[X, Y, Theta]`. (정규화 범위 $[-1, 1]$) |
+| `reward` | $(N,)$ | `float32` | 각 step에서 지급된 보상 (도킹 성공 시 `+1.0`, 일반 step 시 타임 페널티 `-0.01`). |
+| `terminated` | $(N,)$ | `bool` | 에피소드 종료 여부 (성공 도킹 완료 시 `True`). |
+
+### 2. 메타데이터 속성 (Attributes)
+
+HDF5 파일의 루트 속성(`attrs`)에 저장되는 메타데이터는 다음과 같습니다:
+
+* `success` (`bool`): 에피소드의 최종 성공 여부 (골 박스 내부로 완전히 안착하여 도킹에 성공한 경우 `True`).
+* `steps` (`int`): 에피소드의 총 스텝 수 ($N$).
+* `grid` (`list of str`): 학습 환경에 설정되었던 격자 맵 레이아웃 문자열 리스트.
+

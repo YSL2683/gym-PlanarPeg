@@ -65,6 +65,8 @@ class PlanarPegEnv(gym.Env):
         self.mocap_id = self.model.body("mocap").mocapid[0]
         self.start_pos = self.maze_model.start_pos
         self.goal_pos = self.maze_model.goal_pos
+        self.current_goal_pos = self.goal_pos
+        self.current_goal_theta = 0.0
         
         # Physical boundary limits for scaling action inputs
         self.x_limit = (self.maze_model.width * self.cell_size) / 2.0
@@ -125,15 +127,8 @@ class PlanarPegEnv(gym.Env):
         Determined by checking if all 4 corners of the rectangular agent are inside
         the boundaries of the goal pocket.
         """
-        gx, gy = self.goal_pos
-        
-        # Goal pocket inner boundaries relative to goal_pos
-        # Inner depth = 0.13m, opens to the left (-X) from the back wall at x = gx + 0.09
-        # Inner width = 0.09m s.t. y ranges in [gy - 0.045, gy + 0.045]
-        x_min = gx - 0.04
-        x_max = gx + 0.09
-        y_min = gy - 0.045
-        y_max = gy + 0.045
+        gx, gy = self.current_goal_pos
+        g_theta = self.current_goal_theta
         
         # Agent size: half-width = 0.05m (X-axis), half-height = 0.03m (Y-axis)
         half_w = 0.05
@@ -149,14 +144,22 @@ class PlanarPegEnv(gym.Env):
         
         cos_t = np.cos(theta)
         sin_t = np.sin(theta)
+        g_cos = np.cos(g_theta)
+        g_sin = np.sin(g_theta)
         
         for cx, cy in corners_local:
             # Transform to world coordinates
             wx = x + cx * cos_t - cy * sin_t
             wy = y + cx * sin_t + cy * cos_t
             
-            # If any corner lies outside the pocket bounds, it is not fully inside
-            if not (x_min <= wx <= x_max and y_min <= wy <= y_max):
+            # Transform world to goal pocket local frame
+            dx_world = wx - gx
+            dy_world = wy - gy
+            lx = dx_world * g_cos + dy_world * g_sin
+            ly = -dx_world * g_sin + dy_world * g_cos
+            
+            # Inner depth = 0.13m (opens left at -0.04), Inner width = 0.077m
+            if not (-0.04 <= lx <= 0.09 and -0.0385 <= ly <= 0.0385):
                 return False
                 
         return True
@@ -218,7 +221,7 @@ class PlanarPegEnv(gym.Env):
         info = {
             "success": success,
             "elapsed_steps": self._elapsed_steps,
-            "distance_to_goal": np.linalg.norm(np.array([x, y]) - np.array(self.goal_pos))
+            "distance_to_goal": np.linalg.norm(np.array([x, y]) - np.array(self.current_goal_pos))
         }
         
         return obs, reward, terminated, truncated, info
@@ -253,6 +256,21 @@ class PlanarPegEnv(gym.Env):
         sin_half = np.sin(noise_theta / 2.0)
         self.data.mocap_quat[self.mocap_id] = [cos_half, 0, 0, sin_half]
         
+        # Randomize goal position and orientation
+        goal_noise_x = self.np_random.uniform(-0.05, 0.05)
+        goal_noise_y = self.np_random.uniform(-0.05, 0.05)
+        goal_noise_theta = self.np_random.uniform(-10.0 * np.pi / 180.0, 10.0 * np.pi / 180.0)
+        
+        gx = self.goal_pos[0] + goal_noise_x
+        gy = self.goal_pos[1] + goal_noise_y
+        self.current_goal_pos = (gx, gy)
+        self.current_goal_theta = goal_noise_theta
+        
+        goal_body = self.model.body("goal_pocket")
+        goal_body.pos[0] = gx
+        goal_body.pos[1] = gy
+        goal_body.quat[:] = [np.cos(goal_noise_theta / 2.0), 0, 0, np.sin(goal_noise_theta / 2.0)]
+        
         # Compute first physics forward pass
         mujoco.mj_forward(self.model, self.data)
         
@@ -264,7 +282,7 @@ class PlanarPegEnv(gym.Env):
         info = {
             "success": False,
             "elapsed_steps": 0,
-            "distance_to_goal": np.linalg.norm(np.array(self.start_pos) - np.array(self.goal_pos))
+            "distance_to_goal": np.linalg.norm(np.array([actual_start_x, actual_start_y]) - np.array(self.current_goal_pos))
         }
         
         return obs, info
