@@ -209,7 +209,7 @@ def main():
         diff_y = target_y - agent_y
         dist = np.sqrt(diff_x**2 + diff_y**2)
         
-        max_dist = 0.08
+        max_dist = 0.10
         if dist > max_dist:
             target_x = agent_x + max_dist * (diff_x / dist)
             target_y = agent_y + max_dist * (diff_y / dist)

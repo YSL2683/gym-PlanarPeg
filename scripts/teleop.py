@@ -96,7 +96,7 @@ def main():
     last_focus_warn_time = 0.0
     
     while running:
-        clock.tick(20)  # Sleep to enforce 20Hz control frequency
+        clock.tick(10)  # Sleep to enforce 10Hz control frequency
         
         # Check window focus to prevent user confusion with MuJoCo viewer shortcuts
         if not pygame.key.get_focused() and joystick is None:
@@ -182,7 +182,7 @@ def main():
         dist = np.sqrt(diff_x**2 + diff_y**2)
         
         # 1. Spatial distance clamping (Max 0.08 meters error)
-        max_dist = 0.08
+        max_dist = 0.10
         if dist > max_dist:
             target_x = agent_x + max_dist * (diff_x / dist)
             target_y = agent_y + max_dist * (diff_y / dist)
