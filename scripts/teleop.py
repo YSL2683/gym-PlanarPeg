@@ -6,10 +6,12 @@ import argparse
 import numpy as np
 import gymnasium as gym
 import pygame
+import cv2
 
 # Add project root to path to ensure package resolution works cleanly
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from scripts.data_viewer import draw_cv2_plot
 import planar_peg
 
 def main():

@@ -192,7 +192,7 @@ class MazeModel:
                         'type': 'box',
                         'pos': '0.0975 0 0',
                         'size': f'{wall_t} {wall_y_pos} 0.05',
-                        'rgba': '0.1 0.7 0.2 0.6',
+                        'rgba': '0.1 0.7 0.2 1.0',
                         'condim': '3'
                     })
                     
@@ -202,7 +202,7 @@ class MazeModel:
                         'type': 'box',
                         'pos': f'0.025 {wall_y_pos} 0',
                         'size': f'{inner_d} {wall_t} 0.05',
-                        'rgba': '0.1 0.7 0.2 0.6',
+                        'rgba': '0.1 0.7 0.2 1.0',
                         'condim': '3'
                     })
                     
@@ -212,7 +212,7 @@ class MazeModel:
                         'type': 'box',
                         'pos': f'0.025 {-wall_y_pos} 0',
                         'size': f'{inner_d} {wall_t} 0.05',
-                        'rgba': '0.1 0.7 0.2 0.6',
+                        'rgba': '0.1 0.7 0.2 1.0',
                         'condim': '3'
                     })
                     

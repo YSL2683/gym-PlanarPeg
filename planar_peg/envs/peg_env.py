@@ -18,7 +18,7 @@ class PlanarPegEnv(gym.Env):
         self,
         grid: Optional[list] = None,
         cell_size: float = 0.2,
-        n_substeps: int = 50,
+        n_substeps: int = 10,
         render_mode: Optional[str] = None,
         max_episode_steps: int = 250,
     ):

@@ -1,7 +1,7 @@
 <mujoco model="planar_peg_base">
     <compiler coordinate="local" angle="degree"/>
     
-    <option timestep="0.002" integrator="RK4">
+    <option timestep="0.01" integrator="Euler">
         <flag warmstart="enable"/>
     </option>
 
@@ -23,7 +23,7 @@
 
         <!-- Mocap Target Body (Visual target for control, hidden from cameras) -->
         <body name="mocap" mocap="true" pos="0 0 0.025">
-            <geom type="box" size="0.05 0.03 0.025" rgba="1 0 0 0" conaffinity="0" contype="0"/>
+            <geom type="box" size="0.05 0.03 0.025" rgba="1 0.8 0 0" conaffinity="0" contype="0"/>
         </body>
 
         <!-- Actual Agent Body (3-DoF Planar) -->
@@ -43,6 +43,6 @@
 
     <equality>
         <!-- Weld constraint for impedance-like control via mocap body -->
-        <weld body1="mocap" body2="agent" solref="0.02 1.0" solimp="0.9 0.95 0.001 0.5 2"/>
+        <weld body1="mocap" body2="agent" solref="0.06 1.0" solimp="0.3 0.7 0.001 0.5 2"/>
     </equality>
 </mujoco>
