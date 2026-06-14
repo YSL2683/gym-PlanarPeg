@@ -6,17 +6,16 @@ import argparse
 import numpy as np
 import gymnasium as gym
 import pygame
-import cv2
 
 # Add project root to path to ensure package resolution works cleanly
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.data_viewer import draw_cv2_plot
 import planar_peg
 
 def main():
     parser = argparse.ArgumentParser(description="Teleoperate Planar Peg")
     parser.add_argument("--task", type=str, default="ID_base", help="Task name for data organization")
+    parser.add_argument("--device", type=str, choices=["keyboard", "joystick"], default="joystick", help="Input device for teleoperation")
     args = parser.parse_args()
     
     # 1. Initialize Pygame (for keyboard and joystick event reading)
@@ -29,12 +28,22 @@ def main():
     
     # Detect joystick controller
     joystick = None
-    if pygame.joystick.get_count() > 0:
-        joystick = pygame.joystick.Joystick(0)
-        joystick.init()
-        print(f"\n[INFO] Joystick detected: {joystick.get_name()}")
-    else:
-        print("\n[INFO] No joystick detected. Using keyboard controls (Global Coordinates):")
+    if args.device == "joystick":
+        if pygame.joystick.get_count() > 0:
+            joystick = pygame.joystick.Joystick(0)
+            joystick.init()
+            print(f"\n[INFO] Joystick detected: {joystick.get_name()}")
+            print("  - Left Stick  : Translate (Global X/Y)")
+            print("  - Right Stick : Absolute Orientation (Point to face)")
+            print("  - L1/R1       : Rotate (Theta) alternative")
+            print("  - X Button    : Reset current episode manually")
+            print("  - O Button    : Exit program")
+        else:
+            print("\n[WARNING] No joystick detected! Falling back to keyboard.")
+            args.device = "keyboard"
+            
+    if args.device == "keyboard":
+        print("\n[INFO] Using keyboard controls (Global Coordinates):")
         print("  - W / S : Translate Up / Down (Global Y)")
         print("  - A / D : Translate Left / Right (Global X)")
         print("  - Q / E : Rotate CCW / CW (Theta)")
@@ -121,6 +130,14 @@ def main():
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
                     reset_episode()
+            elif event.type == pygame.JOYBUTTONDOWN:
+                if joystick is not None:
+                    if event.button == 0: # Usually X button on Playstation
+                        reset_episode()
+                    elif event.button == 1: # Usually O button on Playstation
+                        print("\n[INFO] Exit button pressed.")
+                        running = False
+                        break
                     
         if not running:
             break
@@ -131,31 +148,34 @@ def main():
         dx_global, dy_global, dtheta = 0.0, 0.0, 0.0
         
         # 3. Read Controller Input
-        # 3.1. Joystick Axis control (Takes precedence if available)
-        if joystick is not None:
+        # 3.1. Joystick Axis control
+        if joystick is not None and args.device == "joystick":
             # Read Left Stick (Translation)
             joy_left_x = joystick.get_axis(0)
             joy_left_y = -joystick.get_axis(1)
             
-            # Read Right Stick X (Rotation)
-            joy_right_x = joystick.get_axis(2) if joystick.get_numaxes() > 2 else 0.0
-            
-            # Deadzone
+            # Deadzone for Translation
             if abs(joy_left_x) < 0.1: joy_left_x = 0.0
             if abs(joy_left_y) < 0.1: joy_left_y = 0.0
-            if abs(joy_right_x) < 0.1: joy_right_x = 0.0
             
-            # Left Stick maps directly to Global X/Y
             dx_global = joy_left_x * move_speed
             dy_global = joy_left_y * move_speed
             
-            # Right Stick or Bumpers for Rotation
-            dtheta = -joy_right_x * rot_speed
-            if joystick.get_button(4): dtheta += rot_speed
-            if joystick.get_button(5): dtheta -= rot_speed
+            # Read Right Stick (Absolute Rotation)
+            joy_right_x = joystick.get_axis(3) if joystick.get_numaxes() > 3 else 0.0
+            joy_right_y = -joystick.get_axis(4) if joystick.get_numaxes() > 4 else 0.0
+            
+            if np.hypot(joy_right_x, joy_right_y) > 0.5:
+                # Twin-stick absolute angle control
+                target_theta_stick = np.arctan2(joy_right_y, joy_right_x)
+                raw_action[2] = target_theta_stick
+            
+            # Bumpers for relative Rotation (fallback)
+            if joystick.get_button(4): dtheta += rot_speed  # L1
+            if joystick.get_button(5): dtheta -= rot_speed  # R1
                 
         # 3.2. Keyboard control
-        else:
+        elif args.device == "keyboard":
             # W/S controls Global Y (Up/Down on screen)
             if keys[pygame.K_w]: dy_global = move_speed      # W: Up
             elif keys[pygame.K_s]: dy_global = -move_speed   # S: Down

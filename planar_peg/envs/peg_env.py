@@ -2,9 +2,10 @@ import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
 import mujoco
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional, Union
 
 from planar_peg.envs.maze_model import MazeModel
+from planar_peg.envs.map import get_map
 
 class PlanarPegEnv(gym.Env):
     """
@@ -16,7 +17,7 @@ class PlanarPegEnv(gym.Env):
 
     def __init__(
         self,
-        grid: Optional[list] = None,
+        grid: Optional[Union[str, list]] = "default",
         cell_size: float = 0.2,
         n_substeps: int = 10,
         render_mode: Optional[str] = None,
@@ -26,7 +27,7 @@ class PlanarPegEnv(gym.Env):
         Initializes the environment.
 
         Args:
-            grid (Optional[list]): The grid map layout. If None, a default 12x7 map is used.
+            grid (Optional[Union[str, list]]): The grid map layout. Can be a string (map name) or a list of strings.
             cell_size (float): Physical size of each grid cell.
             n_substeps (int): Number of simulator substeps per environment step.
             render_mode (Optional[str]): Supports 'human' (passive viewer) and 'rgb_array'.
@@ -34,21 +35,11 @@ class PlanarPegEnv(gym.Env):
         """
         super().__init__()
         
-        # Default grid map: 11x9 rectangular map
-        if grid is None:
-            grid = [
-                "WWWWWWWWWWW",
-                "W.........W",
-                "W.........W",
-                "W....O....W",
-                "W.S.....C.W",
-                "W....O....W",
-                "W.........W",
-                "W.........W",
-                "WWWWWWWWWWW"
-            ]
-            
-        self.grid = grid
+           
+        if isinstance(grid, str):
+            self.grid = get_map(grid)
+        else:
+            self.grid = grid
         self.cell_size = cell_size
         self.n_substeps = n_substeps
         self.render_mode = render_mode
@@ -240,10 +231,10 @@ class PlanarPegEnv(gym.Env):
         sin_half = np.sin(noise_theta / 2.0)
         self.data.mocap_quat[self.mocap_id] = [cos_half, 0, 0, sin_half]
         
-        # Randomize goal position and orientation
+        # Randomize goal position (wider Y) and fix orientation (0.0) for clean OOD testing
         goal_noise_x = self.np_random.uniform(-0.05, 0.05)
-        goal_noise_y = self.np_random.uniform(-0.05, 0.05)
-        goal_noise_theta = self.np_random.uniform(-10.0 * np.pi / 180.0, 10.0 * np.pi / 180.0)
+        goal_noise_y = self.np_random.uniform(-0.15, 0.15)
+        goal_noise_theta = 0.0
         
         gx = self.goal_pos[0] + goal_noise_x
         gy = self.goal_pos[1] + goal_noise_y

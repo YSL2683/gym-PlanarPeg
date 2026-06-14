@@ -15,6 +15,7 @@ def main():
     parser.add_argument("--dataset_name", type=str, default="dataset", help="Name of the Zarr dataset file")
     parser.add_argument("--num_episodes", type=int, default=50, help="Target number of successful episodes")
     parser.add_argument("--resume", action="store_true", help="Resume and append to existing Zarr dataset")
+    parser.add_argument("--device", type=str, choices=["keyboard", "joystick"], default="joystick", help="Input device for teleoperation")
     args = parser.parse_args()
     
     # Setup Zarr Dataset path
@@ -82,10 +83,17 @@ def main():
     update_title()
     
     joystick = None
-    if pygame.joystick.get_count() > 0:
-        joystick = pygame.joystick.Joystick(0)
-        joystick.init()
-        print(f"[INFO] Joystick detected: {joystick.get_name()}")
+    if args.device == "joystick":
+        if pygame.joystick.get_count() > 0:
+            joystick = pygame.joystick.Joystick(0)
+            joystick.init()
+            print(f"[INFO] Joystick detected: {joystick.get_name()}")
+        else:
+            print("[WARNING] No joystick detected! Falling back to keyboard.")
+            args.device = "keyboard"
+            
+    if args.device == "keyboard":
+        print("[INFO] Using keyboard controls.")
         
     print("\n[INFO] Loading Gymnasium environment...")
     env = gym.make("PlanarPegInsertion-v0", render_mode="human")
@@ -168,6 +176,15 @@ def main():
                 if event.key == pygame.K_r:
                     print("\n♻️  [INFO] User discarded episode. Resetting...")
                     reset_episode()
+            elif event.type == pygame.JOYBUTTONDOWN:
+                if joystick is not None:
+                    if event.button == 0: # X button on Playstation
+                        print("\n♻️  [INFO] User discarded episode via Joystick. Resetting...")
+                        reset_episode()
+                    elif event.button == 1: # O button on Playstation
+                        print("\n🛑  [INFO] Exit button pressed on Joystick. Stopping recording...")
+                        running = False
+                        break
                     
         if not running:
             break
@@ -175,21 +192,26 @@ def main():
         agent_x, agent_y, agent_theta = obs["proprioception"]
         dx_global, dy_global, dtheta = 0.0, 0.0, 0.0
         
-        if joystick is not None:
+        if joystick is not None and args.device == "joystick":
             joy_left_x = joystick.get_axis(0)
             joy_left_y = -joystick.get_axis(1)
-            joy_right_x = joystick.get_axis(2) if joystick.get_numaxes() > 2 else 0.0
             
             if abs(joy_left_x) < 0.1: joy_left_x = 0.0
             if abs(joy_left_y) < 0.1: joy_left_y = 0.0
-            if abs(joy_right_x) < 0.1: joy_right_x = 0.0
             
             dx_global = joy_left_x * move_speed
             dy_global = joy_left_y * move_speed
-            dtheta = -joy_right_x * rot_speed
+            
+            joy_right_x = joystick.get_axis(3) if joystick.get_numaxes() > 3 else 0.0
+            joy_right_y = -joystick.get_axis(4) if joystick.get_numaxes() > 4 else 0.0
+            
+            if np.hypot(joy_right_x, joy_right_y) > 0.5:
+                target_theta_stick = np.arctan2(joy_right_y, joy_right_x)
+                raw_action[2] = target_theta_stick
+            
             if joystick.get_button(4): dtheta += rot_speed
             if joystick.get_button(5): dtheta -= rot_speed
-        else:
+        elif args.device == "keyboard":
             if keys[pygame.K_w]: dy_global = move_speed
             elif keys[pygame.K_s]: dy_global = -move_speed
             if keys[pygame.K_a]: dx_global = -move_speed
