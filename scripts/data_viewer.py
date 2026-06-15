@@ -20,12 +20,20 @@ def draw_cv2_plot(proprio, actions, current_step, width, height):
     row_height = height // 3
     pad_y = 15
     
-    # Custom limits for X, Y, Theta to make them scale beautifully in their own rows
-    limits = [
-        (-1.2, 1.2),     # X (m)
-        (-1.2, 1.2),     # Y (m) (Unified with X)
-        (-np.pi, np.pi)  # Theta (rad)
-    ]
+    # Dynamic limits based on raw data max/min
+    limits = []
+    y_ticks = []
+    for dim in range(3):
+        min_val = min(np.min(norm_proprio[:, dim]), np.min(norm_actions[:, dim]))
+        max_val = max(np.max(norm_proprio[:, dim]), np.max(norm_actions[:, dim]))
+        
+        margin = (max_val - min_val) * 0.1
+        if margin == 0: margin = 0.1
+        
+        y_min = min_val - margin
+        y_max = max_val + margin
+        limits.append((y_min, y_max))
+        y_ticks.append([y_min, (y_min + y_max) / 2.0, y_max])
     
     def map_coords(dim, step, val):
         y_min, y_max = limits[dim]
@@ -41,21 +49,16 @@ def draw_cv2_plot(proprio, actions, current_step, width, height):
     colors_solid = [(0, 0, 255), (0, 200, 0), (255, 50, 50)]
     colors_dash = [(150, 150, 255), (150, 255, 150), (255, 150, 150)]
     labels = ["X (m)", "Y (m)", "Theta (rad)"]
-    
-    y_ticks = [
-        [-1.0, 0.0, 1.0],        # X ticks
-        [-1.0, 0.0, 1.0],        # Y ticks
-        [-3.0, 0.0, 3.0]         # Theta ticks
-    ]
         
     for dim in range(3):
         # 1. Draw Dividers and Zero axes
         if dim > 0:
             cv2.line(canvas, (0, dim * row_height), (width, dim * row_height), (100, 100, 100), 1)
             
-        z1 = map_coords(dim, 0, 0.0)
-        z2 = map_coords(dim, num_steps - 1, 0.0)
-        cv2.line(canvas, z1, z2, (80, 80, 80), 1)
+        if limits[dim][0] <= 0.0 <= limits[dim][1]:
+            z1 = map_coords(dim, 0, 0.0)
+            z2 = map_coords(dim, num_steps - 1, 0.0)
+            cv2.line(canvas, z1, z2, (80, 80, 80), 1)
         
         # 2. Draw Y-axis labels and Legend
         cv2.putText(canvas, labels[dim], (width - 80, dim * row_height + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.4, colors_solid[dim], 1, cv2.LINE_AA)
@@ -66,7 +69,7 @@ def draw_cv2_plot(proprio, actions, current_step, width, height):
             
         # 3. Draw Action Target (Dashed/Dotted)
         for i in range(num_steps - 1):
-            if (i // 2) % 2 == 0:
+            if i % 2 == 0:
                 pt1 = map_coords(dim, i, norm_actions[i, dim])
                 pt2 = map_coords(dim, i + 1, norm_actions[i + 1, dim])
                 cv2.line(canvas, pt1, pt2, colors_dash[dim], 1, cv2.LINE_AA)

@@ -99,7 +99,7 @@ def main():
     env = gym.make("PlanarPegInsertion-v0", render_mode="human")
     
     move_speed = 0.05
-    rot_speed = 0.15
+    rot_speed = 0.05
     ema_alpha = 0.15
     clock = pygame.time.Clock()
     
@@ -203,11 +203,9 @@ def main():
             dy_global = joy_left_y * move_speed
             
             joy_right_x = joystick.get_axis(3) if joystick.get_numaxes() > 3 else 0.0
-            joy_right_y = -joystick.get_axis(4) if joystick.get_numaxes() > 4 else 0.0
             
-            if np.hypot(joy_right_x, joy_right_y) > 0.5:
-                target_theta_stick = np.arctan2(joy_right_y, joy_right_x)
-                raw_action[2] = target_theta_stick
+            if abs(joy_right_x) > 0.1:
+                dtheta += -joy_right_x * rot_speed
             
             if joystick.get_button(4): dtheta += rot_speed
             if joystick.get_button(5): dtheta -= rot_speed

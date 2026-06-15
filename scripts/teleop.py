@@ -59,7 +59,7 @@ def main():
 
     # Control hyper-parameters
     move_speed = 0.05
-    rot_speed = 0.15
+    rot_speed = 0.05
     ema_alpha = 0.15  # Exponential Moving Average smoothing factor
     
     # Frequency regulator (20Hz matches render_fps of the env)
@@ -163,12 +163,9 @@ def main():
             
             # Read Right Stick (Absolute Rotation)
             joy_right_x = joystick.get_axis(3) if joystick.get_numaxes() > 3 else 0.0
-            joy_right_y = -joystick.get_axis(4) if joystick.get_numaxes() > 4 else 0.0
             
-            if np.hypot(joy_right_x, joy_right_y) > 0.5:
-                # Twin-stick absolute angle control
-                target_theta_stick = np.arctan2(joy_right_y, joy_right_x)
-                raw_action[2] = target_theta_stick
+            if abs(joy_right_x) > 0.1:
+                dtheta += -joy_right_x * rot_speed
             
             # Bumpers for relative Rotation (fallback)
             if joystick.get_button(4): dtheta += rot_speed  # L1
