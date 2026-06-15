@@ -2,9 +2,14 @@
 
 [English](#english) | [한국어](#한국어)
 
-## English
+
+#### English
 
 A 2.5D physical simulation environment for Planar Peg Insertion built on MuJoCo and Gymnasium. This environment is designed to evaluate generalization performance from Out-Of-Distribution (OOD) to In-Distribution (ID) environments and collect high-quality human demonstration data via teleoperation.
+
+<div align="center">
+  <img src="media/gym_planarpeg.gif" width="400" alt="gym-PlanarPeg Demo">
+</div>
 
 ### Overview
 The task is to control a 3-DoF rectangular peg (agent) bound by a weld constraint to a virtual mocap target, navigate through a narrow gap in a grid-like maze, and dock into a C-shaped Goal Box on the opposite side.
@@ -172,11 +177,15 @@ The root attributes (`attrs`) contain hardcoded metadata to prevent data corrupt
 
 ---
 
-## 한국어
+#### 한국어
 
 [English](#english) | [한국어](#한국어)
 
 MuJoCo와 Gymnasium을 기반으로 구축된 평면 쐐기 삽입(Planar Peg Insertion)을 위한 2.5D 물리 시뮬레이션 환경입니다. 본 환경은 분포 외(OOD) 환경에서 분포 내(ID) 환경으로의 일반화 성능 검증 및 텔레오퍼레이션(원격 조종)을 통한 고품질 사람 시연 데이터 수집을 목적으로 설계되었습니다.
+
+<div align="center">
+  <img src="media/gym_planarpeg.gif" width="400" alt="gym-PlanarPeg Demo">
+</div>
 
 ### 개요
 본 환경의 태스크는 가상의 모캡(Mocap) 타겟에 weld 제약 조건으로 묶인 3-DoF 직사각형 peg(에이전트)를 조종하여, 격자형 미로 내 좁은 장애물 틈새(Gap)를 통과한 뒤 반대편에 위치한 C자형 골 박스(Goal Box)에 도킹하는 것입니다.
