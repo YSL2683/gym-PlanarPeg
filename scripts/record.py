@@ -59,9 +59,9 @@ def main():
         root.attrs['dataset_name'] = args.dataset_name
         
         data = root.create_group('data')
-        data.create_dataset('image_top', shape=(0, 224, 224, 3), chunks=(100, 224, 224, 3), dtype='uint8')
-        data.create_dataset('image_front', shape=(0, 224, 224, 3), chunks=(100, 224, 224, 3), dtype='uint8')
-        data.create_dataset('proprioception', shape=(0, 3), chunks=(100, 3), dtype='float32')
+        data.create_dataset('observation.images.top', shape=(0, 224, 224, 3), chunks=(100, 224, 224, 3), dtype='uint8')
+        data.create_dataset('observation.images.front', shape=(0, 224, 224, 3), chunks=(100, 224, 224, 3), dtype='uint8')
+        data.create_dataset('observation.state', shape=(0, 3), chunks=(100, 3), dtype='float32')
         data.create_dataset('action', shape=(0, 3), chunks=(100, 3), dtype='float32')
         data.create_dataset('reward', shape=(0,), chunks=(100,), dtype='float32')
         data.create_dataset('terminated', shape=(0,), chunks=(100,), dtype='bool')
@@ -103,28 +103,28 @@ def main():
     ema_alpha = 0.15
     clock = pygame.time.Clock()
     
-    ep_images_top = []
-    ep_images_front = []
-    ep_proprioception = []
+    ep_obs_images_top = []
+    ep_obs_images_front = []
+    ep_obs_state = []
     ep_actions = []
     ep_rewards = []
     ep_terminated = []
     
     obs, info = env.reset()
-    agent_init_x, agent_init_y, agent_init_theta = obs["proprioception"]
+    agent_init_x, agent_init_y, agent_init_theta = obs["observation.state"]
     raw_action = np.array([agent_init_x, agent_init_y, agent_init_theta], dtype=np.float32)
     filtered_action = np.copy(raw_action)
     
     def reset_episode():
         nonlocal obs, info, raw_action, filtered_action
         obs, info = env.reset()
-        agent_init_x, agent_init_y, agent_init_theta = obs["proprioception"]
+        agent_init_x, agent_init_y, agent_init_theta = obs["observation.state"]
         raw_action = np.array([agent_init_x, agent_init_y, agent_init_theta], dtype=np.float32)
         filtered_action = np.copy(raw_action)
         
-        ep_images_top.clear()
-        ep_images_front.clear()
-        ep_proprioception.clear()
+        ep_obs_images_top.clear()
+        ep_obs_images_front.clear()
+        ep_obs_state.clear()
         ep_actions.clear()
         ep_rewards.clear()
         ep_terminated.clear()
@@ -134,9 +134,9 @@ def main():
         if len(ep_actions) == 0: return
         
         # Append data directly to Zarr disk arrays
-        root['data/image_top'].append(np.array(ep_images_top, dtype=np.uint8))
-        root['data/image_front'].append(np.array(ep_images_front, dtype=np.uint8))
-        root['data/proprioception'].append(np.array(ep_proprioception, dtype=np.float32))
+        root['data/observation.images.top'].append(np.array(ep_obs_images_top, dtype=np.uint8))
+        root['data/observation.images.front'].append(np.array(ep_obs_images_front, dtype=np.uint8))
+        root['data/observation.state'].append(np.array(ep_obs_state, dtype=np.float32))
         root['data/action'].append(np.array(ep_actions, dtype=np.float32))
         root['data/reward'].append(np.array(ep_rewards, dtype=np.float32))
         root['data/terminated'].append(np.array(ep_terminated, dtype=bool))
@@ -189,7 +189,7 @@ def main():
         if not running:
             break
             
-        agent_x, agent_y, agent_theta = obs["proprioception"]
+        agent_x, agent_y, agent_theta = obs["observation.state"]
         dx_global, dy_global, dtheta = 0.0, 0.0, 0.0
         
         if joystick is not None and args.device == "joystick":
@@ -248,9 +248,9 @@ def main():
         
         next_obs, reward, terminated, truncated, step_info = env.step(step_action)
         
-        ep_images_top.append(obs["image_top"])
-        ep_images_front.append(obs["image_front"])
-        ep_proprioception.append(obs["proprioception"])
+        ep_obs_images_top.append(obs["observation.images.top"])
+        ep_obs_images_front.append(obs["observation.images.front"])
+        ep_obs_state.append(obs["observation.state"])
         ep_actions.append(step_action)
         ep_rewards.append(reward)
         ep_terminated.append(terminated)

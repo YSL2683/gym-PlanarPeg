@@ -66,9 +66,9 @@ def main():
     clock = pygame.time.Clock()
     
     # Buffers to store current episode data
-    ep_images_top = []
-    ep_images_front = []
-    ep_proprioception = []
+    ep_obs_images_top = []
+    ep_obs_images_front = []
+    ep_obs_state = []
     ep_actions = []
     ep_rewards = []
     ep_terminated = []
@@ -78,20 +78,20 @@ def main():
     # Initialize target mocap action
     # Start target synchronized at the agent start position mapped back to [-1, 1]
     # Initialize target mocap action based on actual randomized spawn coordinates from reset
-    agent_init_x, agent_init_y, agent_init_theta = obs["proprioception"]
+    agent_init_x, agent_init_y, agent_init_theta = obs["observation.state"]
     raw_action = np.array([agent_init_x, agent_init_y, agent_init_theta], dtype=np.float32)
     filtered_action = np.copy(raw_action)
     
     def reset_episode():
         nonlocal obs, info, raw_action, filtered_action
         obs, info = env.reset()
-        agent_init_x, agent_init_y, agent_init_theta = obs["proprioception"]
+        agent_init_x, agent_init_y, agent_init_theta = obs["observation.state"]
         raw_action = np.array([agent_init_x, agent_init_y, agent_init_theta], dtype=np.float32)
         filtered_action = np.copy(raw_action)
         
-        ep_images_top.clear()
-        ep_images_front.clear()
-        ep_proprioception.clear()
+        ep_obs_images_top.clear()
+        ep_obs_images_front.clear()
+        ep_obs_state.clear()
         ep_actions.clear()
         ep_rewards.clear()
         ep_terminated.clear()
@@ -143,7 +143,7 @@ def main():
             break
             
         # Get current physical pose of the agent
-        agent_x, agent_y, agent_theta = obs["proprioception"]
+        agent_x, agent_y, agent_theta = obs["observation.state"]
         # Global steering inputs
         dx_global, dy_global, dtheta = 0.0, 0.0, 0.0
         
@@ -225,9 +225,9 @@ def main():
         next_obs, reward, terminated, truncated, step_info = env.step(step_action)
         
         # Buffer historical trajectories
-        ep_images_top.append(obs["image_top"])
-        ep_images_front.append(obs["image_front"])
-        ep_proprioception.append(obs["proprioception"])
+        ep_obs_images_top.append(obs["observation.images.top"])
+        ep_obs_images_front.append(obs["observation.images.front"])
+        ep_obs_state.append(obs["observation.state"])
         ep_actions.append(step_action)
         ep_rewards.append(reward)
         ep_terminated.append(terminated)

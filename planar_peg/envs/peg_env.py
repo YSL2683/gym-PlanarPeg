@@ -75,9 +75,9 @@ class PlanarPegEnv(gym.Env):
         
         # Observation space: top/front RGB views (224x224x3) + proprioception pose [X, Y, Theta]
         self.observation_space = spaces.Dict({
-            "image_top": spaces.Box(low=0, high=255, shape=(224, 224, 3), dtype=np.uint8),
-            "image_front": spaces.Box(low=0, high=255, shape=(224, 224, 3), dtype=np.uint8),
-            "proprioception": spaces.Box(
+            "observation.images.top": spaces.Box(low=0, high=255, shape=(224, 224, 3), dtype=np.uint8),
+            "observation.images.front": spaces.Box(low=0, high=255, shape=(224, 224, 3), dtype=np.uint8),
+            "observation.state": spaces.Box(
                 low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32
             )
         })
@@ -92,11 +92,11 @@ class PlanarPegEnv(gym.Env):
         """Captures images and agent's physical joints to build the observation dictionary."""
         # 1. Render Top-view
         self.renderer.update_scene(self.data, camera="top")
-        image_top = self.renderer.render()
+        obs_images_top = self.renderer.render()
         
         # 2. Render Front-view (1st person)
         self.renderer.update_scene(self.data, camera="front")
-        image_front = self.renderer.render()
+        obs_images_front = self.renderer.render()
         
         # 3. Read agent physical coordinates (x, y, theta) from absolute world coordinates
         # Using body xpos directly to get global X and Y coordinates.
@@ -104,12 +104,12 @@ class PlanarPegEnv(gym.Env):
         y = self.data.body("agent").xpos[1]
         theta = self._normalize_angle(self.data.qpos[2])
         
-        proprioception = np.array([x, y, theta], dtype=np.float32)
+        obs_state = np.array([x, y, theta], dtype=np.float32)
         
         return {
-            "image_top": image_top,
-            "image_front": image_front,
-            "proprioception": proprioception
+            "observation.images.top": obs_images_top,
+            "observation.images.front": obs_images_front,
+            "observation.state": obs_state
         }
         
     def _normalize_angle(self, angle: float) -> float:
@@ -177,7 +177,7 @@ class PlanarPegEnv(gym.Env):
             
         # Compile observation
         obs = self._get_obs()
-        x, y, theta = obs["proprioception"]
+        x, y, theta = obs["observation.state"]
         
         # Verify success
         success = self._check_success(x, y, theta)

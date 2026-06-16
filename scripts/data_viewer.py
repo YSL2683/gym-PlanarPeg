@@ -105,9 +105,9 @@ def main():
     print(f"[INFO] Loading Zarr Dataset: {args.dataset}")
     root = zarr.open(args.dataset, mode='r')
     
-    img_top_all = root['data/image_top']
-    img_front_all = root['data/image_front']
-    proprio_all = root['data/proprioception']
+    img_top_all = root['data/observation.images.top']
+    img_front_all = root['data/observation.images.front']
+    proprio_all = root['data/observation.state']
     actions_all = root['data/action']
     
     has_reward = 'data/reward' in root
