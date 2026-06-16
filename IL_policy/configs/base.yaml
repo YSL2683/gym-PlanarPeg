@@ -65,8 +65,13 @@ train:
   steps: 100000
   log_freq: 100
   save_freq: 10000
-  project_name: "PlanarPeg_DP_Base"
-  run_name: "dp_run_1"
+  use_ema: true
+  ema_power: 0.75
+  max_grad_norm: 1.0
+
+wandb:
+  project: "PlanarPeg_DP_Base"
+  name: "dp_run_1"
 
 val:
   num_episodes: 2

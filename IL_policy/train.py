@@ -12,6 +12,7 @@ import random
 import numpy as np
 import zarr
 
+from diffusers.training_utils import EMAModel
 from utils.dataset import PlanarPegDataset
 from diffusion_policy import DiffusionPolicy
 
@@ -39,8 +40,8 @@ def main(cfg: DictConfig):
     os.makedirs(cfg.train.save_dir, exist_ok=True)
     
     wandb.init(
-        project=cfg.train.project_name, 
-        name=cfg.train.run_name, 
+        project=cfg.wandb.project, 
+        name=cfg.wandb.name, 
         dir=cfg.train.output_dir,
         config=OmegaConf.to_container(cfg, resolve=True)
     )
@@ -90,6 +91,12 @@ def main(cfg: DictConfig):
     optimizer = model.get_optimizer()
     scheduler = model.get_scheduler(optimizer, total_steps)
 
+    use_ema = cfg.train.get("use_ema", False)
+    if use_ema:
+        ema = EMAModel(model.parameters(), power=cfg.train.get("ema_power", 0.75))
+    else:
+        ema = None
+
     best_loss = float('inf')
 
     print("Starting training...")
@@ -115,8 +122,16 @@ def main(cfg: DictConfig):
             loss = model.compute_loss(obs_dict, action)
             
             loss.backward()
+            
+            max_grad_norm = cfg.train.get("max_grad_norm", None)
+            if max_grad_norm is not None:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
+                
             optimizer.step()
             scheduler.step()
+            
+            if ema is not None:
+                ema.step(model.parameters())
             
             step_loss += loss.item()
             progress_bar.update(1)
@@ -137,6 +152,10 @@ def main(cfg: DictConfig):
                 
             val_freq = cfg.val.get("val_offline_freq", 0)
             if val_freq > 0 and val_dataloader is not None and step % val_freq == 0:
+                if ema is not None:
+                    ema.store(model.parameters())
+                    ema.copy_to(model.parameters())
+                    
                 model.eval()
                 val_loss = 0.0
                 num_samples = 0
@@ -160,6 +179,8 @@ def main(cfg: DictConfig):
                     torch.save(model.state_dict(), os.path.join(save_dir, "best.pth"))
                     
                 model.train()
+                if ema is not None:
+                    ema.restore(model.parameters())
                 
             if step % save_freq == 0:
                 torch.save(model.state_dict(), os.path.join(save_dir, f"step_{step}.pth"))
