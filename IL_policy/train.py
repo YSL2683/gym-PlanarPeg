@@ -139,9 +139,10 @@ def main(cfg: DictConfig):
             if ema is not None:
                 ema.step(model.parameters())
             
-            step_loss += loss.item()
+            loss_val = loss.item()
+            step_loss += loss_val
             progress_bar.update(1)
-            progress_bar.set_postfix({"loss": f"{loss.item():.4f}"})
+            progress_bar.set_postfix({"loss": f"{loss_val:.4f}"})
             
             step += 1
             
