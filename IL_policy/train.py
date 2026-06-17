@@ -1,11 +1,11 @@
 import os
+import logging
 import torch
 import wandb
 import hydra
 import json
 import datetime
 from omegaconf import DictConfig, OmegaConf
-from tqdm import tqdm
 from torch.utils.data import DataLoader
 
 import random
@@ -16,8 +16,11 @@ from diffusers.training_utils import EMAModel
 from utils.dataset import PlanarPegDataset
 from diffusion_policy import DiffusionPolicy
 
+logger = logging.getLogger(__name__)
+
 @hydra.main(version_base=None, config_path="configs", config_name="base")
 def main(cfg: DictConfig):
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
     torch.backends.cudnn.benchmark = True
     
     # Set seeds
@@ -63,7 +66,7 @@ def main(cfg: DictConfig):
         train_dataset, 
         batch_size=cfg.train.batch_size, 
         shuffle=True, 
-        num_workers=4, 
+        num_workers=cfg.train.get("num_workers", 4), 
         pin_memory=True
     )
     
@@ -74,7 +77,7 @@ def main(cfg: DictConfig):
             val_dataset,
             batch_size=cfg.val.get("batch_size", 64),
             shuffle=False,
-            num_workers=4,
+            num_workers=cfg.val.get("num_workers", 4),
             pin_memory=True
         )
 
@@ -97,10 +100,9 @@ def main(cfg: DictConfig):
 
     best_loss = float('inf')
 
-    print("Starting training...")
+    logger.info("Starting training...")
     model.train()
     
-    progress_bar = tqdm(total=total_steps, desc="Training")
     step = 0
     step_loss = 0.0
     
@@ -136,14 +138,13 @@ def main(cfg: DictConfig):
                 ema.step(model.parameters())
             
             step_loss += loss.item()
-            progress_bar.update(1)
-            progress_bar.set_postfix({"loss": f"{loss.item():.4f}"})
-            
             step += 1
             
             if step % log_freq == 0:
                 avg_loss = step_loss / log_freq
-                wandb.log({"train/step": step, "train/loss": avg_loss, "train/lr": scheduler.get_last_lr()[0]})
+                lr = scheduler.get_last_lr()[0]
+                wandb.log({"train/step": step, "train/loss": avg_loss, "train/lr": lr})
+                logger.info(f"Step {step}/{total_steps} | Loss: {avg_loss:.4f} | LR: {lr:.2e}")
                 
                 # If no validation set, save best based on training loss
                 if val_dataloader is None and avg_loss < best_loss:
@@ -174,7 +175,7 @@ def main(cfg: DictConfig):
                 
                 avg_val_loss = val_loss / num_samples
                 wandb.log({"val/step": step, "val/loss": avg_val_loss})
-                print(f"\\nStep {step} | Val Loss: {avg_val_loss:.4f}")
+                logger.info(f"Validation at Step {step} | Val Loss: {avg_val_loss:.4f}")
                 
                 if avg_val_loss < best_loss:
                     best_loss = avg_val_loss
@@ -189,7 +190,7 @@ def main(cfg: DictConfig):
                 torch.save(model.state_dict(), os.path.join(save_dir, "latest.pth"))
 
     wandb.finish()
-    print("Training complete!")
+    logger.info("Training complete!")
 
 if __name__ == "__main__":
     main()
