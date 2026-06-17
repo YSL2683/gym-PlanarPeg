@@ -108,6 +108,7 @@ def main(cfg: DictConfig):
     
     log_freq = cfg.train.get("log_freq", 100)
     save_freq = cfg.train.get("save_freq", 10000)
+    save_dir = cfg.train.save_dir
     
     while step < total_steps:
         for obs_dict, action in train_dataloader:
