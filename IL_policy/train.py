@@ -140,6 +140,9 @@ def main(cfg: DictConfig):
                 ema.step(model.parameters())
             
             step_loss += loss.item()
+            progress_bar.update(1)
+            progress_bar.set_postfix({"loss": f"{loss.item():.4f}"})
+            
             step += 1
             
             if step % log_freq == 0:
@@ -147,8 +150,7 @@ def main(cfg: DictConfig):
                 lr = scheduler.get_last_lr()[0]
                 wandb.log({"train/step": step, "train/loss": avg_loss, "train/lr": lr})
                 
-                progress_bar.set_postfix({"loss": f"{avg_loss:.4f}", "lr": f"{lr:.2e}"})
-                progress_bar.update(log_freq)
+                tqdm.write(f"Step {step}/{total_steps} | Loss: {avg_loss:.4f} | LR: {lr:.2e}")
                 
                 # If no validation set, save best based on training loss
                 if val_dataloader is None and avg_loss < best_loss:
