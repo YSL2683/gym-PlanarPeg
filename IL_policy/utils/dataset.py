@@ -71,8 +71,15 @@ class PlanarPegDataset(Dataset):
             episode_indices=episode_indices
         )
         
-        self.img_top = self.root['data/observation.images.top']
-        self.img_front = self.root['data/observation.images.front']
+        cache_all = cfg.train.get("cache_all", False)
+        if cache_all:
+            print("Caching dataset into RAM...")
+            self.img_top = self.root['data/observation.images.top'][:]
+            self.img_front = self.root['data/observation.images.front'][:]
+        else:
+            self.img_top = self.root['data/observation.images.top']
+            self.img_front = self.root['data/observation.images.front']
+            
         self.proprio = self.root['data/observation.state'][:]
         self.action = self.root['data/action'][:]
 

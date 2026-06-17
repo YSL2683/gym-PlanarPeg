@@ -68,6 +68,8 @@ train:
   use_ema: true
   ema_power: 0.75
   max_grad_norm: 1.0
+  use_amp: true
+  cache_all: true
 
 wandb:
   entity: "ysl2683-seoul-national-university-ofscience-and-technology"

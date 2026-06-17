@@ -18,6 +18,7 @@ from diffusion_policy import DiffusionPolicy
 
 @hydra.main(version_base=None, config_path="configs", config_name="base")
 def main(cfg: DictConfig):
+    torch.backends.cudnn.benchmark = True
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = os.path.join("outputs", f"diffusion-{now}")
     
@@ -97,6 +98,10 @@ def main(cfg: DictConfig):
         ema = EMAModel(model.parameters(), power=cfg.train.get("ema_power", 0.75))
     else:
         ema = None
+        
+    use_amp = cfg.train.get("use_amp", False)
+    amp_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+    grad_scaler = torch.amp.GradScaler("cuda", enabled=(use_amp and amp_dtype == torch.float16))
 
     best_loss = float('inf')
 
@@ -121,15 +126,18 @@ def main(cfg: DictConfig):
 
             optimizer.zero_grad()
             
-            loss = model.compute_loss(obs_dict, action)
+            with torch.autocast(device_type="cuda", dtype=amp_dtype, enabled=use_amp):
+                loss = model.compute_loss(obs_dict, action)
             
-            loss.backward()
+            grad_scaler.scale(loss).backward()
             
             max_grad_norm = cfg.train.get("max_grad_norm", None)
             if max_grad_norm is not None:
+                grad_scaler.unscale_(optimizer)
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
                 
-            optimizer.step()
+            grad_scaler.step(optimizer)
+            grad_scaler.update()
             scheduler.step()
             
             if ema is not None:
