@@ -14,17 +14,40 @@ MAPS = {
         "W....O....W",
         "WWWWWWWWWWW"
     ],
-    "empty": [
-        "WWWWWWWWWWW",
-        "W.........W",
-        "W.........W",
-        "W.........W",
-        "W.S.....C.W",
-        "W.........W",
-        "W.........W",
-        "W.........W",
-        "WWWWWWWWWWW"
-    ]
+    "ood_goal_position": [
+            "WWWWWWWWWWW",
+            "W....O....W",
+            "W....O..C.W",
+            "W....O....W",
+            "W.S.......W",
+            "W....O....W",
+            "W....O....W",
+            "W....O....W",
+            "WWWWWWWWWWW"
+        ],
+    "ood_start_position": [
+            "WWWWWWWWWWW",
+            "W....O....W",
+            "W.S..O....W",
+            "W....O....W",
+            "W.......C.W",
+            "W....O....W",
+            "W....O....W",
+            "W....O....W",
+            "WWWWWWWWWWW"
+        ],
+    "ood_obstacle_position": [
+            "WWWWWWWWWWW",
+            "W....O....W",
+            "W....O....W",
+            "W.........W",
+            "W.S..O..C.W",
+            "W....O....W",
+            "W....O....W",
+            "W....O....W",
+            "WWWWWWWWWWW"
+        ]       
+
 }
 
 def get_map(map_name: str) -> list:
