@@ -23,23 +23,37 @@ def main(cfg: DictConfig):
     logger.info("Starting evaluation...")
     logger.info(f"Using policy: {cfg.policy.name}")
     
-    if cfg.get("checkpoint_path"):
+    run_dir = None
+    
+    if cfg.get("checkpoint_path") and os.path.exists(cfg.checkpoint_path):
         logger.info(f"Searching for the specified checkpoint path: {cfg.checkpoint_path}")
         ckpt_path = cfg.checkpoint_path
+        run_dir = str(Path(ckpt_path).parent.parent)
     elif cfg.get("checkpoint_dir"):
-        logger.info(f"Searching for best checkpoint in {cfg.checkpoint_dir}")
-        ckpt_path = get_best_checkpoint(cfg.checkpoint_dir)
+        ckpt_dir_path = Path(cfg.checkpoint_dir)
+        if (ckpt_dir_path / "checkpoints").exists():
+            ckpt_dir_path = ckpt_dir_path / "checkpoints"
+            
+        logger.info(f"Searching for best checkpoint in {ckpt_dir_path}")
+        ckpt_path = get_best_checkpoint(ckpt_dir_path)
         if ckpt_path is None:
-            logger.info(f"Searching for latest checkpoint in {cfg.checkpoint_dir}")
-            ckpt_path = get_latest_checkpoint(cfg.checkpoint_dir)
-    elif cfg.get("eval_dir"):
-        ckpt_dir = os.path.join(cfg.eval_dir, "checkpoints")
-        logger.info(f"Searching for best checkpoint in {ckpt_dir} (fallback)")
-        ckpt_path = get_best_checkpoint(ckpt_dir)
+            logger.info(f"Searching for latest checkpoint in {ckpt_dir_path}")
+            ckpt_path = get_latest_checkpoint(ckpt_dir_path)
+        
+        if ckpt_path:
+            run_dir = str(Path(ckpt_path).parent.parent)
+    elif cfg.get("eval_dir") and os.path.exists(cfg.eval_dir) and "eval" not in cfg.eval_dir:
+        # Fallback for old eval_dir usage
+        ckpt_dir_path = Path(cfg.eval_dir) / "checkpoints"
+        logger.info(f"Searching for best checkpoint in {ckpt_dir_path} (fallback)")
+        ckpt_path = get_best_checkpoint(ckpt_dir_path)
         if ckpt_path is None:
-            ckpt_path = get_latest_checkpoint(ckpt_dir)
+            ckpt_path = get_latest_checkpoint(ckpt_dir_path)
+            
+        if ckpt_path:
+            run_dir = str(Path(ckpt_path).parent.parent)
     else:
-        logger.warning("No checkpoint_dir or checkpoint_path provided")
+        logger.warning("No valid checkpoint_dir or checkpoint_path provided")
         return
         
     if ckpt_path is None:
@@ -53,11 +67,11 @@ def main(cfg: DictConfig):
     grid_name = cfg.task.get("grid", "default")
     env = gym.make("PlanarPegInsertion-v0", render_mode="human", grid=grid_name)
     
-    eval_dir = cfg.get("eval_dir")
-    if not eval_dir and ckpt_path:
-        eval_dir = str(Path(ckpt_path).parent.parent)
+    if run_dir is None:
+        logger.warning("Could not determine run directory to load stats.json")
+        return
         
-    stats_path = os.path.join(eval_dir, "stats.json")
+    stats_path = os.path.join(run_dir, "stats.json")
     with open(stats_path, "r") as f:
         stats = json.load(f)
         

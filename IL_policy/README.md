@@ -1,77 +1,78 @@
 # IL Policy (Diffusion Policy for PlanarPeg)
 
-This directory contains the Imitation Learning (IL) module for the `PlanarPegInsertion-v0` environment, implementing a **Diffusion Policy** architecture adapted from [Chi et al. (2023)](https://diffusion-policy.cs.columbia.edu/) and perfectly aligned with the structural configuration of `manipulation_pipeline`.
+This directory contains the Imitation Learning (IL) module for the `PlanarPegInsertion-v0` environment, implementing a highly optimized **Diffusion Policy** architecture adapted from [Chi et al. (2023)](https://diffusion-policy.cs.columbia.edu/).
+
+The configuration and evaluation pipelines have been refactored to align perfectly with the structural standards of `manipulation_pipeline`.
 
 ## 📁 Directory Structure
 
 ```text
 IL_policy/
 ├── configs/
-│   └── base.yaml              # Single unified configuration file (Hydra)
+│   └── base.yaml              # Unified Hydra configuration file with dynamic path interpolation
 ├── models/
 │   ├── conditional_unet1d.py  # 1D U-Net backbone for noise prediction
 │   └── vision_encoder.py      # ResNet18-based spatial softmax vision encoder
 ├── utils/
-│   ├── dataset.py             # Zarr-based dataset loader (PlanarPegDataset)
-│   └── normalize.py           # MinMax Normalization/Unnormalization modules
+│   ├── dataset.py             # Zarr-based dataset loader with RAM caching
+│   ├── normalize.py           # MinMax Normalization/Unnormalization modules
+│   └── checkpoints.py         # Utilities for resolving best/latest checkpoints
 ├── diffusion_policy.py        # Core Diffusion Policy implementation (DDIM/DDPM)
-├── train.py                   # Main training loop with WandB integration
-├── eval.py                    # Evaluation script for the Gym environment
+├── train.py                   # Main training loop (AMP, EMA, GradClip, offline Validation)
+├── eval.py                    # Evaluation script mirroring manipulation_pipeline
 └── requirements.txt           # Required dependencies
 ```
 
-## 🛠️ Architecture Highlights
+## 🛠️ Architecture & Optimizations
 
-- **Vision Encoder**: Utilizes `timm`'s ResNet18 without pooling, followed by a Spatial Softmax layer to extract 2D keypoints dynamically from multi-view images (`top` and `front`).
-- **Diffusion Model**: Employs a 1D Conditional U-Net (`ConditionalUnet1d`) using FiLM modulation for visual and state conditioning.
-- **Schedulers**: Supports both `DDPM` and `DDIM` (via Hugging Face `diffusers`). Easily swappable via `base.yaml`.
-- **Normalization**: Dynamically computes Min-Max boundaries across the entire dataset (`stats.json`) and strictly bounds network inputs/outputs to `[-1, 1]`.
-- **Action Buffering**: The policy maintains an internal `collections.deque` queue. It evaluates the environment once, generates an entire trajectory (`pred_horizon`), buffers `action_horizon` steps, and pops them sequentially to drastically accelerate inference.
+- **Automatic Mixed Precision (AMP)**: Accelerates U-Net and ResNet computations using `torch.autocast` (`float16`/`bfloat16`) and `GradScaler`, halving VRAM usage.
+- **Zarr RAM Caching**: Dramatically eliminates Disk I/O bottlenecks by pre-loading Zarr datasets directly into RAM using `cache_all: true`.
+- **Stabilization**: Employs **Exponential Moving Average (EMA)** (`power: 0.75`) for stable model checkpoints, coupled with Gradient Clipping (`max_grad_norm: 1.0`).
+- **Dynamic Checkpoint Resolution**: The `eval.py` script automatically searches for the best checkpoints (`best.pth`) without hardcoded file paths.
+- **Vision Encoder**: Utilizes `timm`'s ResNet18 followed by a Spatial Softmax layer to extract 2D keypoints dynamically from multi-view images (`top` and `front`).
 
 ## 🚀 Quick Start
 
-## 📦 0. Dependencies
+### 📦 0. Dependencies
 
-Ensure the local `planar_peg` conda environment has the dependencies installed:
+Ensure the local conda environment has the dependencies installed:
 ```bash
 pip install -r IL_policy/requirements.txt
 ```
-*(Key dependencies include: `torch`, `diffusers`, `timm`, `hydra-core`, `zarr`, and `wandb`)*
 
 ### 1. Training
 
-Training is managed via [Hydra](https://hydra.cc/). All hyperparameters (optimizer, scheduler, UNet sizing, and DDIM parameters) can be configured directly inside `configs/base.yaml` or overridden via CLI.
+Training is managed via [Hydra](https://hydra.cc/). Directory paths (`output_dir`, `checkpoint_dir`, `log_dir`) are dynamically interpolated in `base.yaml`.
 
 ```bash
 # Run training with default settings
 python IL_policy/train.py
 
-# Override batch size and steps via CLI
-python IL_policy/train.py train.batch_size=32 train.steps=50000
+# Override hyperparameters via CLI
+python IL_policy/train.py train.batch_size=128 train.steps=50000
 ```
 
-*Note: Training will automatically create an isolated log directory under the repository root:*  
-`outputs/diffusion-[YYYYMMDD]_[HHMMSS]/` containing `checkpoints/`, `wandb/`, `logs/`, and `stats.json`.
-
-## ⚙️ Configuration (`base.yaml`)
-
-The `base.yaml` file exposes fine-grained architectural controls. Key tunable parameters include:
-
-- `policy.noise_scheduler.type`: Switch between `DDIM` and `DDPM`.
-- `policy.noise_scheduler.num_inference_steps`: Controls DDIM generation speed vs. quality.
-- `policy.unet.down_dims`: Scale the capacity of the U-Net.
-- `optimizer_lr` & `scheduler_warmup_steps`: Training convergence tuning.
-- `policy.obs_horizon` & `policy.action_horizon`: Context length and receding horizon length.
+*Note: Training logs and checkpoints are automatically saved to: `outputs/planar_peg/diffusion/[SESSION_DATE_TIME]/`*
 
 ### 2. Evaluation
 
-To evaluate a trained checkpoint in the `gymnasium` environment, pass the generated `eval_dir` to the evaluation script. The script will automatically load the checkpoint (`best.pth`) and the corresponding normalization statistics (`stats.json`).
+To evaluate a trained model, pass the checkpoint directory (or explicit path) to the `eval.py` script. The script automatically determines the optimal checkpoint.
 
 ```bash
-python IL_policy/eval.py eval_dir=outputs/diffusion-20260616_140455
+# Automatically load the best.pth from a specific run directory
+python IL_policy/eval.py checkpoint_dir=outputs/planar_peg-diffusion-20260617_150000
+
+# Specify the exact checkpoint path
+python IL_policy/eval.py checkpoint_path=outputs/planar_peg-diffusion-20260617_150000/checkpoints/step_10000.pth
+
+# Override evaluation parameters (e.g., test 20 episodes on a specific OOD map)
+python IL_policy/eval.py checkpoint_dir=outputs/... val.eval_n_envs=20 task.grid="hard_maze"
 ```
 
-You can also specify a specific checkpoint file using `checkpoint_name`:
-```bash
-python IL_policy/eval.py eval_dir=outputs/diffusion-20260616_140455 checkpoint_name=epoch_50.pth
-```
+## ⚙️ Configuration (`base.yaml`)
+
+Key tunable parameters in `configs/base.yaml`:
+- **train.use_amp / train.cache_all**: Toggles for performance optimizations.
+- **train.use_ema**: Toggles Exponential Moving Average weight tracking.
+- **policy.noise_scheduler.num_inference_steps**: Controls DDIM generation speed vs. quality.
+- **val.eval_n_envs**: Number of evaluation episodes run by `eval.py`.
