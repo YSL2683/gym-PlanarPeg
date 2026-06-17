@@ -18,8 +18,6 @@ output_dir: ${base_dir}/outputs/${task.name}-${session}
 log_dir: ${output_dir}/logs
 checkpoint_dir: ${output_dir}/checkpoints
 checkpoint_path: null
-eval_dir: ${output_dir}/eval
-val_dir: ${output_dir}/val
 crop_shape: [216, 216]
 
 # Optimizer

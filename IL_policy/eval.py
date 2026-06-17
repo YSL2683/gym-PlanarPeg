@@ -42,16 +42,6 @@ def main(cfg: DictConfig):
         
         if ckpt_path:
             run_dir = str(Path(ckpt_path).parent.parent)
-    elif cfg.get("eval_dir") and os.path.exists(cfg.eval_dir) and "eval" not in cfg.eval_dir:
-        # Fallback for old eval_dir usage
-        ckpt_dir_path = Path(cfg.eval_dir) / "checkpoints"
-        logger.info(f"Searching for best checkpoint in {ckpt_dir_path} (fallback)")
-        ckpt_path = get_best_checkpoint(ckpt_dir_path)
-        if ckpt_path is None:
-            ckpt_path = get_latest_checkpoint(ckpt_dir_path)
-            
-        if ckpt_path:
-            run_dir = str(Path(ckpt_path).parent.parent)
     else:
         logger.warning("No valid checkpoint_dir or checkpoint_path provided")
         return
@@ -59,6 +49,13 @@ def main(cfg: DictConfig):
     if ckpt_path is None:
         logger.warning("No checkpoint found")
         return
+        
+    if run_dir:
+        eval_log_dir = os.path.join(run_dir, "eval")
+        os.makedirs(eval_log_dir, exist_ok=True)
+        file_handler = logging.FileHandler(os.path.join(eval_log_dir, "eval.log"))
+        file_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
+        logger.addHandler(file_handler)
 
     num_episodes = cfg.val.get("eval_n_envs", 10)
     device = cfg.device
