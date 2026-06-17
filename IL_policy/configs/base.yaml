@@ -11,8 +11,15 @@ hydra:
 # System/Global
 device: "cuda"
 seed: 42
-eval_dir: null
-checkpoint_name: "best.pth"
+
+session: ${policy.name}-${now:%Y%m%d_%H%M%S}
+base_dir: ${hydra:runtime.cwd}
+output_dir: ${base_dir}/outputs/${task.name}-${session}
+log_dir: ${output_dir}/logs
+checkpoint_dir: ${output_dir}/checkpoints
+checkpoint_path: null
+eval_dir: ${output_dir}/eval
+val_dir: ${output_dir}/val
 crop_shape: [216, 216]
 
 # Optimizer
@@ -74,9 +81,10 @@ train:
 wandb:
   entity: "ysl2683-seoul-national-university-ofscience-and-technology"
   project: "PlanarPeg_DP_Base"
-  name: "dp_run_1"
+  name: ${task.name}-${session}
 
 val:
   num_episodes: 2
   val_offline_freq: 200
   batch_size: 64
+  eval_n_envs: 10

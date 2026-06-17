@@ -3,7 +3,9 @@ import os
 import torch
 import hydra
 import json
+import logging
 from omegaconf import DictConfig
+from pathlib import Path
 import numpy as np
 import gymnasium as gym
 from collections import deque
@@ -11,25 +13,55 @@ from collections import deque
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import planar_peg
 from diffusion_policy import DiffusionPolicy
+from utils.checkpoints import get_best_checkpoint, get_latest_checkpoint
+
+logger = logging.getLogger(__name__)
 
 @hydra.main(version_base=None, config_path="configs", config_name="base")
 def main(cfg: DictConfig):
-    if cfg.eval_dir is None:
-        raise ValueError("Please provide eval_dir, e.g. python IL_policy/eval.py eval_dir=outputs/diffusion-20260522_195047")
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+    logger.info("Starting evaluation...")
+    logger.info(f"Using policy: {cfg.policy.name}")
+    
+    if cfg.get("checkpoint_path"):
+        logger.info(f"Searching for the specified checkpoint path: {cfg.checkpoint_path}")
+        ckpt_path = cfg.checkpoint_path
+    elif cfg.get("checkpoint_dir"):
+        logger.info(f"Searching for best checkpoint in {cfg.checkpoint_dir}")
+        ckpt_path = get_best_checkpoint(cfg.checkpoint_dir)
+        if ckpt_path is None:
+            logger.info(f"Searching for latest checkpoint in {cfg.checkpoint_dir}")
+            ckpt_path = get_latest_checkpoint(cfg.checkpoint_dir)
+    elif cfg.get("eval_dir"):
+        ckpt_dir = os.path.join(cfg.eval_dir, "checkpoints")
+        logger.info(f"Searching for best checkpoint in {ckpt_dir} (fallback)")
+        ckpt_path = get_best_checkpoint(ckpt_dir)
+        if ckpt_path is None:
+            ckpt_path = get_latest_checkpoint(ckpt_dir)
+    else:
+        logger.warning("No checkpoint_dir or checkpoint_path provided")
+        return
         
-    ckpt_name = cfg.get("checkpoint_name", "best.pth")
-    ckpt_path = os.path.join(cfg.eval_dir, "checkpoints", ckpt_name)
-    num_episodes = 10
+    if ckpt_path is None:
+        logger.warning("No checkpoint found")
+        return
+
+    num_episodes = cfg.val.get("eval_n_envs", 10)
     device = cfg.device
 
-    print(f"Loading environment...")
-    env = gym.make("PlanarPegInsertion-v0", render_mode="human")
+    logger.info("Loading environment...")
+    grid_name = cfg.task.get("grid", "default")
+    env = gym.make("PlanarPegInsertion-v0", render_mode="human", grid=grid_name)
     
-    stats_path = os.path.join(cfg.eval_dir, "stats.json")
+    eval_dir = cfg.get("eval_dir")
+    if not eval_dir and ckpt_path:
+        eval_dir = str(Path(ckpt_path).parent.parent)
+        
+    stats_path = os.path.join(eval_dir, "stats.json")
     with open(stats_path, "r") as f:
         stats = json.load(f)
         
-    print(f"Loading model from {ckpt_path}...")
+    logger.info(f"Loading model from {ckpt_path}...")
     model = DiffusionPolicy(cfg, stats=stats).to(device)
     model.load_state_dict(torch.load(ckpt_path, map_location=device))
     model.eval()
@@ -79,14 +111,14 @@ def main(cfg: DictConfig):
             if terminated or truncated:
                 if info.get("success", False):
                     success_count += 1
-                    print(f"Episode {ep_idx + 1}: SUCCESS")
+                    logger.info(f"Episode {ep_idx + 1}: SUCCESS")
                 else:
-                    print(f"Episode {ep_idx + 1}: FAILED")
+                    logger.info(f"Episode {ep_idx + 1}: FAILED")
                 done = True
                 
             step_idx += 1
             
-    print(f"\nEvaluation Complete! Success Rate: {success_count}/{num_episodes} ({success_count/num_episodes*100:.1f}%)")
+    logger.info(f"Evaluation Complete! Success Rate: {success_count}/{num_episodes} ({success_count/num_episodes*100:.1f}%)")
     env.close()
 
 if __name__ == "__main__":

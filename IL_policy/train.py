@@ -19,26 +19,18 @@ from diffusion_policy import DiffusionPolicy
 @hydra.main(version_base=None, config_path="configs", config_name="base")
 def main(cfg: DictConfig):
     torch.backends.cudnn.benchmark = True
-    now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = os.path.join("outputs", f"diffusion-{now}")
     
     # Set seeds
     if "seed" in cfg:
         torch.manual_seed(cfg.seed)
         np.random.seed(cfg.seed)
         random.seed(cfg.seed)
-    
-    OmegaConf.set_struct(cfg, False)
-    cfg.train.output_dir = output_dir
-    cfg.train.log_dir = os.path.join(output_dir, "logs")
-    cfg.train.save_dir = os.path.join(output_dir, "checkpoints")
-    OmegaConf.set_struct(cfg, True)
-
+        
     print(OmegaConf.to_yaml(cfg))
     
-    os.makedirs(cfg.train.output_dir, exist_ok=True)
-    os.makedirs(cfg.train.log_dir, exist_ok=True)
-    os.makedirs(cfg.train.save_dir, exist_ok=True)
+    os.makedirs(cfg.output_dir, exist_ok=True)
+    os.makedirs(cfg.log_dir, exist_ok=True)
+    os.makedirs(cfg.checkpoint_dir, exist_ok=True)
     
     wandb.init(
         entity=cfg.wandb.entity,
@@ -114,7 +106,7 @@ def main(cfg: DictConfig):
     
     log_freq = cfg.train.get("log_freq", 100)
     save_freq = cfg.train.get("save_freq", 10000)
-    save_dir = cfg.train.save_dir
+    save_dir = cfg.checkpoint_dir
     
     while step < total_steps:
         for obs_dict, action in train_dataloader:
