@@ -124,6 +124,7 @@ class DiffusionPolicy(nn.Module):
         self.noise_scheduler.set_timesteps(self.num_inference_steps)
         
         for k in self.noise_scheduler.timesteps:
+            k = k.to(device) if torch.is_tensor(k) else torch.tensor(k, device=device)
             noise_pred = self.noise_pred_net(
                 sample=sample, 
                 timestep=k,
