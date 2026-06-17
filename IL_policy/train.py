@@ -40,6 +40,7 @@ def main(cfg: DictConfig):
     os.makedirs(cfg.train.save_dir, exist_ok=True)
     
     wandb.init(
+        entity=cfg.wandb.entity,
         project=cfg.wandb.project, 
         name=cfg.wandb.name, 
         dir=cfg.train.output_dir,

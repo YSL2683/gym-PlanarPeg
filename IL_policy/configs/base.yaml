@@ -70,6 +70,7 @@ train:
   max_grad_norm: 1.0
 
 wandb:
+  entity: "ysl2683-seoul-national-university-ofscience-and-technology"
   project: "PlanarPeg_DP_Base"
   name: "dp_run_1"
 
