@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 import random
 import numpy as np
 import zarr
+from tqdm import tqdm
 
 from diffusers.training_utils import EMAModel
 from utils.dataset import PlanarPegDataset
@@ -103,6 +104,7 @@ def main(cfg: DictConfig):
     logger.info("Starting training...")
     model.train()
     
+    progress_bar = tqdm(total=total_steps, desc="Training")
     step = 0
     step_loss = 0.0
     
@@ -144,7 +146,9 @@ def main(cfg: DictConfig):
                 avg_loss = step_loss / log_freq
                 lr = scheduler.get_last_lr()[0]
                 wandb.log({"train/step": step, "train/loss": avg_loss, "train/lr": lr})
-                logger.info(f"Step {step}/{total_steps} | Loss: {avg_loss:.4f} | LR: {lr:.2e}")
+                
+                progress_bar.set_postfix({"loss": f"{avg_loss:.4f}", "lr": f"{lr:.2e}"})
+                progress_bar.update(log_freq)
                 
                 # If no validation set, save best based on training loss
                 if val_dataloader is None and avg_loss < best_loss:
