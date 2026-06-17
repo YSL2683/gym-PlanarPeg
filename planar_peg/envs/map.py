@@ -17,8 +17,8 @@ MAPS = {
     "ood_goal_position": [
             "WWWWWWWWWWW",
             "W....O....W",
-            "W....O..C.W",
             "W....O....W",
+            "W....O..C.W",
             "W.S.......W",
             "W....O....W",
             "W....O....W",
@@ -28,8 +28,8 @@ MAPS = {
     "ood_start_position": [
             "WWWWWWWWWWW",
             "W....O....W",
-            "W.S..O....W",
             "W....O....W",
+            "W.S..O....W",
             "W.......C.W",
             "W....O....W",
             "W....O....W",

@@ -68,10 +68,10 @@ policy:
     use_film_scale_modulation: true
 
 train:
-  batch_size: 64
-  steps: 100000
+  batch_size: 128
+  steps: 10000
   log_freq: 100
-  save_freq: 10000
+  save_freq: 1000
   use_ema: true
   ema_power: 0.75
   max_grad_norm: 1.0
