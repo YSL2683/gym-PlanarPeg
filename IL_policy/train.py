@@ -36,7 +36,7 @@ def main(cfg: DictConfig):
         entity=cfg.wandb.entity,
         project=cfg.wandb.project, 
         name=cfg.wandb.name, 
-        dir=cfg.train.output_dir,
+        dir=cfg.output_dir,
         config=OmegaConf.to_container(cfg, resolve=True)
     )
 
@@ -55,7 +55,7 @@ def main(cfg: DictConfig):
     
     stats = train_dataset.get_stats()
     
-    stats_path = os.path.join(cfg.train.output_dir, "stats.json")
+    stats_path = os.path.join(cfg.output_dir, "stats.json")
     with open(stats_path, "w") as f:
         json.dump(stats, f, indent=4)
     
