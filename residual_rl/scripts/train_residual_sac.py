@@ -70,7 +70,7 @@ def evaluate(eval_env, base_policy, actor, action_scaler, state_standardizer, cf
         record_video = (i == 0 and wandb_run is not None)
         
         if record_video:
-            top_img = eval_wrapper.env._get_obs()['observation.images.top']
+            top_img = eval_wrapper.env.unwrapped._get_obs()['observation.images.top']
             video_frames.append(top_img)
             
         while not done:
@@ -82,7 +82,7 @@ def evaluate(eval_env, base_policy, actor, action_scaler, state_standardizer, cf
             done = terminated or truncated
             
             if record_video:
-                top_img = eval_wrapper.env._get_obs()['observation.images.top']
+                top_img = eval_wrapper.env.unwrapped._get_obs()['observation.images.top']
                 video_frames.append(top_img)
                 
             if info.get('success', False): # Only trust the explicit success flag
