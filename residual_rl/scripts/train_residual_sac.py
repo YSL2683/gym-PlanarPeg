@@ -183,7 +183,7 @@ def main():
             # Analytical Dense Reward for expert demos
             discount_power = seq_len - 1 - t
             dense_r = (cfg.dense_reward.discount_gamma ** discount_power) * cfg.dense_reward.p_reward
-            reward = 0.0 + dense_r
+            reward = -1.0 + dense_r
             next_obs_state = state_standardizer.standardize(ep_states[t+1])
             next_obs_base_action = action_scaler.scale(ep_actions[t+1])
             done = False
@@ -204,7 +204,7 @@ def main():
         res_action = np.zeros(action_dim, dtype=np.float32)
         discount_power = 0
         dense_r = (cfg.dense_reward.discount_gamma ** discount_power) * cfg.dense_reward.p_reward
-        reward = 500.0 + dense_r # Success
+        reward = 100.0 + dense_r # Success
         # Next state is dummy (episode ends)
         next_obs_state = obs_state
         next_obs_base_action = obs_base_action

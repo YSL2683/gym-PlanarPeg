@@ -182,13 +182,13 @@ class PlanarPegEnv(gym.Env):
         # Verify success
         success = self._check_success(x, y, theta)
         
-        # Reward function
-        # +500.0 for success to prevent dense reward farming, 0.0 otherwise
+        # Reward function (LaNE style)
+        # +100.0 for success, -1.0 step penalty otherwise
         if success:
-            reward = 500.0
+            reward = 100.0
             terminated = True
         else:
-            reward = 0.0
+            reward = -1.0
             terminated = False
             
         truncated = self._elapsed_steps >= self.max_episode_steps
