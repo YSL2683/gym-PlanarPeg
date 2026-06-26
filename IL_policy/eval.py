@@ -53,7 +53,8 @@ def main(cfg: DictConfig):
     if run_dir:
         eval_log_dir = os.path.join(run_dir, "eval")
         os.makedirs(eval_log_dir, exist_ok=True)
-        file_handler = logging.FileHandler(os.path.join(eval_log_dir, "eval.log"))
+        log_filename = f"eval_{cfg.task.name}.log"
+        file_handler = logging.FileHandler(os.path.join(eval_log_dir, log_filename))
         file_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
         logger.addHandler(file_handler)
 
