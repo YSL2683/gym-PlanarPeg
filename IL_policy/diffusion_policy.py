@@ -23,6 +23,7 @@ class DiffusionPolicy(nn.Module):
         self.obs_horizon = cfg.policy.obs_horizon
         self.action_horizon = cfg.policy.action_horizon
         self.action_dim = cfg.task.action_dim
+        self.use_delta_action = cfg.task.get("use_delta_action", False)
         
         if stats is not None:
             self.normalize_inputs = NormalizeMinMax(["observation.state"], stats)
@@ -141,12 +142,20 @@ class DiffusionPolicy(nn.Module):
     @torch.no_grad()
     def select_action(self, obs_dict):
         self.eval()
+        
+        if self.use_delta_action:
+            unnormalized_state = obs_dict["observation.state"][:, -1, :].clone()
+            
         obs_dict = self.normalize_inputs(obs_dict)
         
         if len(self._action_queue) == 0:
             actions = self.generate_actions(obs_dict)
             
             actions = self.unnormalize_outputs({"action": actions})["action"]
+            
+            if self.use_delta_action:
+                actions = actions + unnormalized_state.unsqueeze(1)
+                
             self._latest_full_pred = actions.clone()
             
             start = self.obs_horizon - 1

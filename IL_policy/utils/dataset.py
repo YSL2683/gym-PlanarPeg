@@ -82,16 +82,33 @@ class PlanarPegDataset(Dataset):
             
         self.proprio = self.root['data/observation.state'][:]
         self.action = self.root['data/action'][:]
+        
+        self.use_delta_action = cfg.task.get("use_delta_action", False)
 
     def get_stats(self):
         """Computes min/max over the dataset for normalization."""
         stats = {}
         
-        actions = self.action
-        stats["action"] = {
-            "min": actions.min(axis=0).tolist(),
-            "max": actions.max(axis=0).tolist()
-        }
+        if self.use_delta_action:
+            print("Computing sequence-relative delta action statistics...")
+            all_deltas = []
+            for b_s, b_e, s_s, s_e in self.indices:
+                a_seq = sample_sequence(self.action, self.sequence_length, b_s, b_e, s_s, s_e)
+                p_seq = sample_sequence(self.proprio, self.sequence_length, b_s, b_e, s_s, s_e)
+                curr_state = p_seq[self.obs_horizon - 1]
+                all_deltas.append(a_seq - curr_state)
+            
+            all_deltas = np.concatenate(all_deltas, axis=0)
+            stats["action"] = {
+                "min": all_deltas.min(axis=0).tolist(),
+                "max": all_deltas.max(axis=0).tolist()
+            }
+        else:
+            actions = self.action
+            stats["action"] = {
+                "min": actions.min(axis=0).tolist(),
+                "max": actions.max(axis=0).tolist()
+            }
         
         proprio = self.proprio
         stats["observation.state"] = {
@@ -110,6 +127,10 @@ class PlanarPegDataset(Dataset):
         img_front = sample_sequence(self.img_front, self.sequence_length, buffer_start_idx, buffer_end_idx, sample_start_idx, sample_end_idx)
         proprio = sample_sequence(self.proprio, self.sequence_length, buffer_start_idx, buffer_end_idx, sample_start_idx, sample_end_idx)
         action = sample_sequence(self.action, self.sequence_length, buffer_start_idx, buffer_end_idx, sample_start_idx, sample_end_idx)
+        
+        if self.use_delta_action:
+            current_state = proprio[self.obs_horizon - 1]
+            action = action - current_state
         
         img_top = torch.from_numpy(img_top).float().permute(0, 3, 1, 2) / 255.0
         img_front = torch.from_numpy(img_front).float().permute(0, 3, 1, 2) / 255.0

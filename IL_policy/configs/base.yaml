@@ -35,6 +35,7 @@ task:
   dataset_root: "data/ID_base/dataset.zarr"
   state_dim: 3
   action_dim: 3
+  use_delta_action: true
 
 policy:
   name: "diffusion"
