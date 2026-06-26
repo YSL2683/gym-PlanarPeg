@@ -14,7 +14,7 @@ seed: 42
 
 session: ${policy.name}-${now:%Y%m%d_%H%M%S}
 base_dir: ${hydra:runtime.cwd}
-output_dir: ${base_dir}/outputs/${task.name}-${session}
+output_dir: IL_policy/outputs/${task.name}-${session}
 log_dir: ${output_dir}/logs
 checkpoint_dir: ${output_dir}/checkpoints
 checkpoint_path: null
