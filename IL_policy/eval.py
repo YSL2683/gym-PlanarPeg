@@ -129,7 +129,7 @@ def main(cfg: DictConfig):
                 
             step_idx += 1
             
-    logger.info(f"Evaluation Complete for Task [{cfg.task.name}] Grid [{grid_name}]! Success Rate: {success_count}/{num_episodes} ({success_count/num_episodes*100:.1f}%)")
+    logger.info(f"Evaluation Complete for Task [{cfg.task.name}] Success Rate: {success_count}/{num_episodes} ({success_count/num_episodes*100:.1f}%)")
     env.close()
 
 if __name__ == "__main__":
