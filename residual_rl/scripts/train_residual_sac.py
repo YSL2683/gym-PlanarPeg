@@ -276,7 +276,10 @@ def main():
         # RL Update
         if step >= cfg.train.learning_starts and len(replay_buffer) >= cfg.train.batch_size:
             batch = replay_buffer.sample(cfg.train.batch_size, device)
-            alpha = log_alpha.exp()
+            if getattr(cfg.sac, 'learn_alpha', True):
+                alpha = log_alpha.exp()
+            else:
+                alpha = torch.tensor(cfg.sac.fixed_alpha, device=device)
             
             # -- Critic Update --
             with torch.no_grad():
@@ -308,11 +311,12 @@ def main():
                 actor_loss.backward()
                 actor_opt.step()
                 
-                # -- Alpha Update --
-                alpha_loss = -(log_alpha * (log_prob_pred.detach() + target_entropy)).mean()
-                alpha_opt.zero_grad()
-                alpha_loss.backward()
-                alpha_opt.step()
+                if getattr(cfg.sac, 'learn_alpha', True):
+                    # -- Alpha Update --
+                    alpha_loss = -(log_alpha * (log_prob_pred.detach() + target_entropy)).mean()
+                    alpha_opt.zero_grad()
+                    alpha_loss.backward()
+                    alpha_opt.step()
                 
             # -- Soft Update --
             if step % cfg.sac.actor_update_freq == 0: # Usually coupled with actor update
