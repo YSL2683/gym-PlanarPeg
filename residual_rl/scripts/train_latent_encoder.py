@@ -22,6 +22,7 @@ def parse_args():
     parser.add_argument('--device', type=str, default='cuda')
     parser.add_argument('--dino_batch_size', type=int, default=32)
     parser.add_argument('--config', type=str, default='residual_rl/configs/residual_sac.yaml')
+    parser.add_argument('--use_all_cameras', action='store_true', help='Use both top and front cameras')
     return parser.parse_args()
 
 def main():
@@ -36,7 +37,8 @@ def main():
         device = 'cpu'
         
     import datetime
-    run_name = f"latent_encoder-{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    prefix = "latent_encoder_all_cams" if args.use_all_cameras else "latent_encoder_front_only"
+    run_name = f"{prefix}-{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
     run_dir = os.path.join(args.output_dir, run_name)
     os.makedirs(run_dir, exist_ok=True)
     output_path = os.path.join(run_dir, 'latent_cache.pt')
@@ -59,11 +61,13 @@ def main():
     print(f"Loading dataset from {args.dataset_root}")
     root = zarr.open(args.dataset_root, 'r')
     
-    images = root['data/observation.images.front'][:] # (N, H, W, C) uint8
+    images_front = root['data/observation.images.front'][:] # (N, H, W, C) uint8
+    if args.use_all_cameras:
+        images_top = root['data/observation.images.top'][:]
     states = root['data/observation.state'][:] # (N, 3) float32
     episode_ends = root['meta/episode_ends'][:] # (num_episodes,) int64
     
-    num_frames = images.shape[0]
+    num_frames = images_front.shape[0]
     num_episodes = episode_ends.shape[0]
     print(f"Loaded {num_episodes} episodes, {num_frames} frames.")
 
@@ -74,17 +78,27 @@ def main():
     all_embeddings = []
     
     for i in tqdm(range(0, num_frames, args.dino_batch_size)):
-        batch_imgs = images[i:i+args.dino_batch_size]
-        # Preprocess: (B, H, W, C) -> (B, C, H, W)
-        batch_imgs = torch.from_numpy(batch_imgs).permute(0, 3, 1, 2).float() / 255.0
-        batch_imgs = batch_imgs.to(device)
+        batch_front = images_front[i:i+args.dino_batch_size]
+        batch_front = torch.from_numpy(batch_front).permute(0, 3, 1, 2).float() / 255.0
+        batch_front = batch_front.to(device)
         
         with torch.no_grad():
-            emb = dino_encoder(batch_imgs)
-        
+            emb_front = dino_encoder(batch_front)
+            
+        if args.use_all_cameras:
+            batch_top = images_top[i:i+args.dino_batch_size]
+            batch_top = torch.from_numpy(batch_top).permute(0, 3, 1, 2).float() / 255.0
+            batch_top = batch_top.to(device)
+            with torch.no_grad():
+                emb_top = dino_encoder(batch_top)
+            emb = torch.cat([emb_front, emb_top], dim=1)
+        else:
+            emb = emb_front
+            
         all_embeddings.append(emb.cpu())
         
-    all_embeddings = torch.cat(all_embeddings, dim=0) # (N, 384)
+    all_embeddings = torch.cat(all_embeddings, dim=0) # (N, 384 or 768)
+    obs_dim = all_embeddings.shape[1]
     
     # 3. Build transitions
     print("Building transitions...")
@@ -118,7 +132,7 @@ def main():
     
     # 4. Train MLPE2C
     print("Training MLPE2C...")
-    e2c = MLPE2C(obs_dim=args.obs_dim, action_dim=args.action_dim, z_dim=args.z_dim).to(device)
+    e2c = MLPE2C(obs_dim=obs_dim, action_dim=args.action_dim, z_dim=args.z_dim).to(device)
     optimizer = torch.optim.Adam(e2c.parameters(), lr=args.lr)
     
     for epoch in range(args.num_epochs):
@@ -136,7 +150,7 @@ def main():
             kl, recon, trans = e2c(obs_emb, action, next_obs_emb)
             
             # Weight MSE by obs_dim (768 or 384) as in LaNE
-            loss = kl + recon * args.obs_dim + trans
+            loss = kl + recon * obs_dim + trans
             
             optimizer.zero_grad()
             loss.backward()
@@ -204,9 +218,10 @@ def main():
         'z_demo_all': z_demo_all,
         'discount_all': discount_all,
         'ref_one_step_dist': ref_one_step_dist,
-        'obs_dim': args.obs_dim,
+        'obs_dim': obs_dim,
         'z_dim': args.z_dim,
         'action_dim': args.action_dim,
+        'use_all_cameras': args.use_all_cameras,
     }, output_path)
     
     if 'wandb' in locals() and wandb is not None and wandb.run is not None:

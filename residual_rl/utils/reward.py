@@ -22,6 +22,7 @@ class LaNEDenseReward:
         obs_dim = cache['obs_dim']
         z_dim = cache['z_dim']
         action_dim = cache['action_dim']
+        self.use_all_cameras = cache.get('use_all_cameras', False)
 
         # Instantiate models
         self.dino_encoder = DINOFrontEncoder(device=device)
@@ -33,12 +34,13 @@ class LaNEDenseReward:
             p.requires_grad = False
 
     @torch.no_grad()
-    def compute(self, front_images, done):
+    def compute(self, front_images, done, top_images=None):
         """
         Compute additional reward for a batch of states.
         Args:
             front_images: (B, 3, 224, 224) float32 in [0, 1]
             done: (B,) bool or float
+            top_images: (B, 3, 224, 224) float32 in [0, 1], optional
         Returns:
             additional_reward: (B,) float tensor
         """
@@ -46,7 +48,13 @@ class LaNEDenseReward:
             return torch.zeros(front_images.shape[0], device=self.device)
 
         # 1. Embed and encode current states
-        dino_emb = self.dino_encoder(front_images)
+        dino_emb_front = self.dino_encoder(front_images)
+        if self.use_all_cameras and top_images is not None:
+            dino_emb_top = self.dino_encoder(top_images)
+            dino_emb = torch.cat([dino_emb_front, dino_emb_top], dim=1)
+        else:
+            dino_emb = dino_emb_front
+            
         z_pred, _ = self.e2c.enc(dino_emb) # Using mean for comparison. Shape: (B, z_dim)
 
         # 2. Compute distances to all demo states at once

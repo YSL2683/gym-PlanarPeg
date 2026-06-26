@@ -106,9 +106,16 @@ def main():
     seed = args.seed if args.seed is not None else cfg.seed
     set_seed(seed)
     
-    # Create timestamped run directory
+    # Determine prefix from cache
+    try:
+        cache = torch.load(cfg.latent_cache_path, map_location='cpu', weights_only=False)
+        is_all_cams = cache.get('use_all_cameras', False)
+    except:
+        is_all_cams = False
+
     import datetime
-    run_name = f"residual_sac-{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    prefix = "residual_sac_all_cams" if is_all_cams else "residual_sac_front_only"
+    run_name = f"{prefix}-{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
     run_dir = os.path.join(cfg.output_dir, run_name)
     ckpt_dir = os.path.join(run_dir, 'checkpoints')
     os.makedirs(ckpt_dir, exist_ok=True)
@@ -281,8 +288,9 @@ def main():
         
         # Compute dense reward
         front_img = torch.from_numpy(next_obs['observation.images.front']).unsqueeze(0).to(device)
+        top_img = torch.from_numpy(next_obs['observation.images.top']).unsqueeze(0).to(device)
         done_tensor = torch.tensor([done], device=device)
-        dense_r = dense_reward_calc.compute(front_img, done_tensor).item()
+        dense_r = dense_reward_calc.compute(front_img, done_tensor, top_images=top_img).item()
         total_reward = env_reward + dense_r
         
         # Store transition
@@ -367,6 +375,7 @@ def main():
             if wandb and wandb.run:
                 wandb.log({
                     'train/episode_reward': episode_reward,
+                    'train/episode_length': episode_steps,
                     'train/episode': episode_count,
                     'train/success_rate': train_success,
                     'train/residual_magnitude': episode_res_magnitude / episode_steps if episode_steps > 0 else 0.0,

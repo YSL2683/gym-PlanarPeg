@@ -87,10 +87,14 @@ class PlanarPegResidualWrapper(gym.Wrapper):
         front_img = raw_obs['observation.images.front'].astype(np.float32) / 255.0
         front_img = np.transpose(front_img, (2, 0, 1)) # (H,W,C) -> (C,H,W)
         
+        top_img = raw_obs['observation.images.top'].astype(np.float32) / 255.0
+        top_img = np.transpose(top_img, (2, 0, 1))
+        
         return {
             'observation.state': std_state,
             'observation.base_action': self._last_base_naction,
-            'observation.images.front': front_img
+            'observation.images.front': front_img,
+            'observation.images.top': top_img
         }
 
     def reset(self, **kwargs):
