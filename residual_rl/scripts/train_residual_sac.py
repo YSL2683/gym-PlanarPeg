@@ -71,7 +71,7 @@ def evaluate(eval_env, base_policy, actor, action_scaler, state_standardizer, cf
                 action = action.cpu().numpy().flatten()
             obs, reward, terminated, truncated, info = eval_wrapper.step(action)
             done = terminated or truncated
-            if info.get('success', False) or reward > 0: # Assuming sparse reward 1 on success
+            if info.get('success', False): # Only trust the explicit success flag
                 successes += 1
                 break
     return successes / cfg.eval.episodes
@@ -180,8 +180,10 @@ def main():
             obs_base_action = action_scaler.scale(ep_actions[t])
             # Residual is zero for GT demo
             res_action = np.zeros(action_dim, dtype=np.float32)
-            # Assuming sparse reward at the end
-            reward = 0.0
+            # Analytical Dense Reward for expert demos
+            discount_power = seq_len - 1 - t
+            dense_r = (cfg.dense_reward.discount_gamma ** discount_power) * cfg.dense_reward.p_reward
+            reward = 0.0 + dense_r
             next_obs_state = state_standardizer.standardize(ep_states[t+1])
             next_obs_base_action = action_scaler.scale(ep_actions[t+1])
             done = False
@@ -200,7 +202,10 @@ def main():
         obs_state = state_standardizer.standardize(ep_states[-1])
         obs_base_action = action_scaler.scale(ep_actions[-1])
         res_action = np.zeros(action_dim, dtype=np.float32)
-        reward = 1.0 # Success
+        
+        discount_power = 0
+        dense_r = (cfg.dense_reward.discount_gamma ** discount_power) * cfg.dense_reward.p_reward
+        reward = 1.0 + dense_r # Success
         # Next state is dummy (episode ends)
         next_obs_state = obs_state
         next_obs_base_action = obs_base_action
@@ -225,6 +230,9 @@ def main():
     obs, info = wrapped_env.reset()
     episode_reward = 0
     episode_count = 0
+    episode_steps = 0
+    episode_dense_active_steps = 0
+    episode_res_magnitude = 0
     
     pbar = tqdm(range(cfg.train.total_timesteps))
     for step in pbar:
@@ -261,6 +269,10 @@ def main():
         })
         
         episode_reward += total_reward
+        episode_steps += 1
+        if dense_r > 0:
+            episode_dense_active_steps += 1
+        episode_res_magnitude += float(np.abs(residual_action).mean())
         
         # RL Update
         if step >= cfg.train.learning_starts and len(replay_buffer) >= cfg.train.batch_size:
@@ -319,9 +331,19 @@ def main():
             
         # Episode boundary
         if done:
+            train_success = float(info.get('success', False))
             if wandb and wandb.run:
-                wandb.log({'train/episode_reward': episode_reward, 'train/episode': episode_count}, step=step)
+                wandb.log({
+                    'train/episode_reward': episode_reward,
+                    'train/episode': episode_count,
+                    'train/success_rate': train_success,
+                    'train/residual_magnitude': episode_res_magnitude / episode_steps if episode_steps > 0 else 0.0,
+                    'train/dense_reward_activation_rate': episode_dense_active_steps / episode_steps if episode_steps > 0 else 0.0,
+                }, step=step)
             episode_reward = 0
+            episode_steps = 0
+            episode_dense_active_steps = 0
+            episode_res_magnitude = 0
             episode_count += 1
             obs, info = wrapped_env.reset()
         else:
