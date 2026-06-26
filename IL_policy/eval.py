@@ -61,8 +61,8 @@ def main(cfg: DictConfig):
     device = cfg.device
 
     logger.info("Loading environment...")
-    grid_name = cfg.task.get("grid", "default")
-    env = gym.make("PlanarPegInsertion-v0", render_mode="human", grid=grid_name)
+    grid_name = cfg.task.name
+    env = gym.make("PlanarPegInsertion-v0", render_mode=cfg.val.get("render_mode", None), grid=grid_name)
     
     if run_dir is None:
         logger.warning("Could not determine run directory to load stats.json")
@@ -129,7 +129,7 @@ def main(cfg: DictConfig):
                 
             step_idx += 1
             
-    logger.info(f"Evaluation Complete! Success Rate: {success_count}/{num_episodes} ({success_count/num_episodes*100:.1f}%)")
+    logger.info(f"Evaluation Complete for Task [{cfg.task.name}] Grid [{grid_name}]! Success Rate: {success_count}/{num_episodes} ({success_count/num_episodes*100:.1f}%)")
     env.close()
 
 if __name__ == "__main__":

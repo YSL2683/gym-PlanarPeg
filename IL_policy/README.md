@@ -28,6 +28,7 @@ IL_policy/
 - **Automatic Mixed Precision (AMP)**: Accelerates U-Net and ResNet computations using `torch.autocast` (`float16`/`bfloat16`) and `GradScaler`, halving VRAM usage.
 - **Zarr RAM Caching**: Dramatically eliminates Disk I/O bottlenecks by pre-loading Zarr datasets directly into RAM using `cache_all: true`.
 - **Stabilization**: Employs **Exponential Moving Average (EMA)** (`power: 0.75`) for stable model checkpoints, coupled with Gradient Clipping (`max_grad_norm: 1.0`).
+- **Sequence-Relative Delta Actions**: Transforms world-absolute action trajectories into relative delta trajectories referenced from the robot's current state ($S_t$). This resolves out-of-distribution (OOD) "teleportation" failures when evaluating on unseen starting positions.
 - **Dynamic Checkpoint Resolution**: The `eval.py` script automatically searches for the best checkpoints (`best.pth`) without hardcoded file paths.
 - **Vision Encoder**: Utilizes `timm`'s ResNet18 followed by a Spatial Softmax layer to extract 2D keypoints dynamically from multi-view images (`top` and `front`).
 
@@ -72,6 +73,7 @@ python IL_policy/eval.py checkpoint_dir=outputs/... val.eval_n_envs=20 task.grid
 ## ⚙️ Configuration (`base.yaml`)
 
 Key tunable parameters in `configs/base.yaml`:
+- **task.use_delta_action**: (Crucial for OOD) Toggles sequence-relative delta action training vs absolute coordinate training. Must be `true` for generalizable policies.
 - **train.use_amp / train.cache_all**: Toggles for performance optimizations.
 - **train.use_ema**: Toggles Exponential Moving Average weight tracking.
 - **policy.noise_scheduler.num_inference_steps**: Controls DDIM generation speed vs. quality.

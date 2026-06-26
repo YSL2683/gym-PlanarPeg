@@ -31,7 +31,7 @@ scheduler_name: cosine
 scheduler_warmup_steps: 500
 
 task:
-  name: "planar_peg"
+  name: "default"
   dataset_root: "data/ID_base/dataset.zarr"
   state_dim: 3
   action_dim: 3
@@ -89,3 +89,4 @@ val:
   batch_size: 64
   num_workers: 4
   eval_n_envs: 10
+  render_mode: null
