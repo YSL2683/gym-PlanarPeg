@@ -1,6 +1,6 @@
 # Base Policy
 base_policy:
-  run_dir: null  # Must be set: path to IL_policy training run directory
+  run_dir: "IL_policy/outputs/planar_peg-diffusion-20260626_160010"  # Must be set: path to IL_policy training run directory
   checkpoint: "best.pth"  # or "step_10000.pth"
 
 # Environment
