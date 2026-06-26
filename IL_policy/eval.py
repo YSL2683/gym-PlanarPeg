@@ -58,7 +58,7 @@ def main(cfg: DictConfig):
         file_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
         logger.addHandler(file_handler)
 
-    num_episodes = cfg.val.get("eval_n_envs", 10)
+    num_episodes = cfg.val.get("eval_n_episodes", 10)
     device = cfg.device
 
     logger.info("Loading environment...")

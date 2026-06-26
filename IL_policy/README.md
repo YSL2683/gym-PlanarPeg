@@ -67,7 +67,7 @@ python IL_policy/eval.py checkpoint_dir=outputs/planar_peg-diffusion-20260617_15
 python IL_policy/eval.py checkpoint_path=outputs/planar_peg-diffusion-20260617_150000/checkpoints/step_10000.pth
 
 # Override evaluation parameters (e.g., test 20 episodes on a specific OOD map)
-python IL_policy/eval.py checkpoint_dir=outputs/... val.eval_n_envs=20 task.grid="hard_maze"
+python IL_policy/eval.py checkpoint_dir=outputs/... val.eval_n_episodes=20 task.grid="hard_maze"
 ```
 
 ## ⚙️ Configuration (`base.yaml`)
@@ -77,4 +77,4 @@ Key tunable parameters in `configs/base.yaml`:
 - **train.use_amp / train.cache_all**: Toggles for performance optimizations.
 - **train.use_ema**: Toggles Exponential Moving Average weight tracking.
 - **policy.noise_scheduler.num_inference_steps**: Controls DDIM generation speed vs. quality.
-- **val.eval_n_envs**: Number of evaluation episodes run by `eval.py`.
+- **val.eval_n_episodes**: Number of evaluation episodes run by `eval.py`.

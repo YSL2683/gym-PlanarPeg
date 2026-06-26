@@ -88,5 +88,5 @@ val:
   val_offline_freq: 200
   batch_size: 64
   num_workers: 4
-  eval_n_envs: 10
+  eval_n_episodes: 10
   render_mode: null
