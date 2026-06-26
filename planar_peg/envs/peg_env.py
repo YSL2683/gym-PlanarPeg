@@ -183,9 +183,9 @@ class PlanarPegEnv(gym.Env):
         success = self._check_success(x, y, theta)
         
         # Reward function
-        # +1.0 for success, otherwise 0.0
+        # +500.0 for success to prevent dense reward farming, 0.0 otherwise
         if success:
-            reward = 1.0
+            reward = 500.0
             terminated = True
         else:
             reward = 0.0

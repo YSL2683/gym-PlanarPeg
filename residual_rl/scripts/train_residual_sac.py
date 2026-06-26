@@ -202,10 +202,9 @@ def main():
         obs_state = state_standardizer.standardize(ep_states[-1])
         obs_base_action = action_scaler.scale(ep_actions[-1])
         res_action = np.zeros(action_dim, dtype=np.float32)
-        
         discount_power = 0
         dense_r = (cfg.dense_reward.discount_gamma ** discount_power) * cfg.dense_reward.p_reward
-        reward = 1.0 + dense_r # Success
+        reward = 500.0 + dense_r # Success
         # Next state is dummy (episode ends)
         next_obs_state = obs_state
         next_obs_base_action = obs_base_action
