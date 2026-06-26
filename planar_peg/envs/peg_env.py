@@ -183,12 +183,12 @@ class PlanarPegEnv(gym.Env):
         success = self._check_success(x, y, theta)
         
         # Reward function
-        # +1.0 for success, with a tiny time cost penalty (-0.01) to promote efficiency
+        # +1.0 for success, otherwise 0.0
         if success:
             reward = 1.0
             terminated = True
         else:
-            reward = -0.01
+            reward = 0.0
             terminated = False
             
         truncated = self._elapsed_steps >= self.max_episode_steps
