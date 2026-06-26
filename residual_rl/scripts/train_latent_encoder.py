@@ -21,13 +21,14 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--device', type=str, default='cuda')
     parser.add_argument('--dino_batch_size', type=int, default=32)
-    parser.add_argument('--wandb_project', type=str, default='PlanarPeg_ResidualRL')
-    parser.add_argument('--wandb_entity', type=str, default=None)
-    parser.add_argument('--wandb_mode', type=str, default='online')
+    parser.add_argument('--config', type=str, default='residual_rl/configs/residual_sac.yaml')
     return parser.parse_args()
 
 def main():
     args = parse_args()
+    
+    from omegaconf import OmegaConf
+    cfg = OmegaConf.load(args.config)
     
     device = args.device
     if device == 'cuda' and not torch.cuda.is_available():
@@ -43,9 +44,9 @@ def main():
     try:
         import wandb
         wandb.init(
-            project=args.wandb_project,
-            entity=args.wandb_entity,
-            mode=args.wandb_mode,
+            project=cfg.wandb.project,
+            entity=cfg.wandb.entity,
+            mode=cfg.wandb.mode,
             name=run_name,
             dir=run_dir,
             config=vars(args)
