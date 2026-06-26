@@ -57,13 +57,22 @@ def build_obs_tensor(obs, device):
     base_action = torch.from_numpy(obs['observation.base_action']).float().unsqueeze(0).to(device)
     return torch.cat([state, base_action], dim=-1) # (1, 6)
 
-def evaluate(eval_env, base_policy, actor, action_scaler, state_standardizer, cfg, device):
+def evaluate(eval_env, base_policy, actor, action_scaler, state_standardizer, cfg, device, step=None, wandb_run=None):
     # Create wrapper
     eval_wrapper = PlanarPegResidualWrapper(eval_env, base_policy, action_scaler, state_standardizer, device)
     successes = 0
-    for _ in range(cfg.eval.episodes):
+    
+    video_frames = []
+    
+    for i in range(cfg.eval.episodes):
         obs, _ = eval_wrapper.reset()
         done = False
+        record_video = (i == 0 and wandb_run is not None)
+        
+        if record_video:
+            top_img = eval_wrapper.env._get_obs()['observation.images.top']
+            video_frames.append(top_img)
+            
         while not done:
             obs_tensor = build_obs_tensor(obs, device)
             with torch.no_grad():
@@ -71,9 +80,22 @@ def evaluate(eval_env, base_policy, actor, action_scaler, state_standardizer, cf
                 action = action.cpu().numpy().flatten()
             obs, reward, terminated, truncated, info = eval_wrapper.step(action)
             done = terminated or truncated
+            
+            if record_video:
+                top_img = eval_wrapper.env._get_obs()['observation.images.top']
+                video_frames.append(top_img)
+                
             if info.get('success', False): # Only trust the explicit success flag
                 successes += 1
                 break
+                
+    if len(video_frames) > 0 and wandb_run is not None:
+        # wandb.Video expects shape (time, channel, height, width) for RGB
+        # video_frames is list of (H, W, C) -> array of (T, H, W, C)
+        vid_array = np.array(video_frames)
+        vid_array = np.transpose(vid_array, (0, 3, 1, 2))
+        wandb_run.log({"eval/video": wandb.Video(vid_array, fps=10, format="mp4")}, step=step)
+        
     return successes / cfg.eval.episodes
 
 def main():
@@ -224,7 +246,14 @@ def main():
         
     replay_buffer.load_offline(offline_transitions)
 
-    # 8. Training Loop
+    # 8. Initial Evaluation (Base Policy Zero-Shot Performance)
+    print("Evaluating Base Policy (step 0)...")
+    base_success = evaluate(eval_env, base_policy, actor, action_scaler, state_standardizer, cfg, device, step=0, wandb_run=wandb.run if wandb else None)
+    if wandb and wandb.run:
+        wandb.log({'eval/success_rate': base_success}, step=0)
+    print(f"Step 0 | Base Policy Eval Success: {base_success:.2%}")
+
+    # 9. Training Loop
     print("Starting Training...")
     obs, info = wrapped_env.reset()
     episode_reward = 0
@@ -354,7 +383,7 @@ def main():
             
         # Evaluation
         if step > 0 and step % cfg.eval.freq == 0:
-            eval_success = evaluate(eval_env, base_policy, actor, action_scaler, state_standardizer, cfg, device)
+            eval_success = evaluate(eval_env, base_policy, actor, action_scaler, state_standardizer, cfg, device, step=step, wandb_run=wandb.run if wandb else None)
             if wandb and wandb.run:
                 wandb.log({'eval/success_rate': eval_success}, step=step)
             pbar.write(f"Step {step} | Eval Success: {eval_success:.2%}")
