@@ -126,7 +126,7 @@ def main():
         is_all_cams = False
 
     import datetime
-    prefix = "residual_sac_all_cams" if is_all_cams else "residual_sac_front_only"
+    prefix = "residual_rl_all_cams" if is_all_cams else "residual_rl_front_only"
     run_name = f"{prefix}-{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
     run_dir = os.path.join(cfg.output_dir, run_name)
     ckpt_dir = os.path.join(run_dir, 'checkpoints')
@@ -448,7 +448,6 @@ def main():
             torch.save({
                 'actor': actor.state_dict(),
                 'critic': critic.state_dict(),
-                'log_alpha': log_alpha.detach().cpu(),
                 'step': step,
             }, os.path.join(ckpt_dir, f'checkpoint_{step}.pt'))
 
