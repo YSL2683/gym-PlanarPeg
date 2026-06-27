@@ -407,12 +407,12 @@ def main():
                 actor_opt.step()
                 
             # Update targets using polyak averaging
-            if step >= cfg.train.critic_warmup_steps and step % cfg.sac.target_update_freq == 0:
+            if step >= cfg.train.critic_warmup_steps and step % cfg.sac.actor_update_freq == 0:
                 with torch.no_grad():
                     for param, target_param in zip(critic.parameters(), critic_target.parameters()):
-                        target_param.data.copy_(cfg.sac.tau * param.data + (1 - cfg.sac.tau) * target_param.data)
+                        target_param.data.copy_(cfg.critic.target_tau * param.data + (1 - cfg.critic.target_tau) * target_param.data)
                     for param, target_param in zip(actor.parameters(), actor_target.parameters()):
-                        target_param.data.copy_(cfg.sac.tau * param.data + (1 - cfg.sac.tau) * target_param.data)
+                        target_param.data.copy_(cfg.critic.target_tau * param.data + (1 - cfg.critic.target_tau) * target_param.data)
                             
         # Logging step
         if wandb and wandb.run and step >= cfg.train.critic_warmup_steps:
