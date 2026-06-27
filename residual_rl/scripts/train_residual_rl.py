@@ -52,12 +52,24 @@ def set_seed(seed):
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
-def build_obs_tensor(obs, device):
+def extract_feat_and_prop(obs, device, dense_reward_calc, is_all_cams):
     state = torch.from_numpy(obs['observation.state']).float().unsqueeze(0).to(device)
     base_action = torch.from_numpy(obs['observation.base_action']).float().unsqueeze(0).to(device)
-    return torch.cat([state, base_action], dim=-1) # (1, 6)
+    prop = torch.cat([state, base_action], dim=-1) # (1, 6)
+    
+    front_img = torch.from_numpy(obs['observation.images.front']).unsqueeze(0).to(device)
+    with torch.no_grad():
+        emb_front = dense_reward_calc.dino_encoder(front_img)
+        if is_all_cams:
+            top_img = torch.from_numpy(obs['observation.images.top']).unsqueeze(0).to(device)
+            emb_top = dense_reward_calc.dino_encoder(top_img)
+            feat = torch.cat([emb_front, emb_top], dim=1)
+        else:
+            feat = emb_front
+            
+    return feat, prop
 
-def evaluate(eval_env, base_policy, actor, action_scaler, state_standardizer, cfg, device, step=None, wandb_run=None):
+def evaluate(eval_env, base_policy, actor, action_scaler, state_standardizer, cfg, device, dense_reward_calc, is_all_cams, step=None, wandb_run=None):
     # Create wrapper
     eval_wrapper = PlanarPegResidualWrapper(eval_env, base_policy, action_scaler, state_standardizer, device)
     successes = 0
@@ -74,9 +86,9 @@ def evaluate(eval_env, base_policy, actor, action_scaler, state_standardizer, cf
             video_frames.append(top_img)
             
         while not done:
-            obs_tensor = build_obs_tensor(obs, device)
+            feat, prop = extract_feat_and_prop(obs, device, dense_reward_calc, is_all_cams)
             with torch.no_grad():
-                action = actor.select_action(obs_tensor, deterministic=True)
+                action = actor.select_action(feat, prop, deterministic=True)
                 action = action.cpu().numpy().flatten()
             obs, reward, terminated, truncated, info = eval_wrapper.step(action)
             done = terminated or truncated
@@ -178,24 +190,47 @@ def main():
     print("Loading Dense Reward Module...")
     dense_reward_calc = LaNEDenseReward(cfg.latent_cache_path, device, cfg.dense_reward.discount_gamma, cfg.dense_reward.p_reward)
 
+    from residual_rl.models.actor import ResidualTD3Actor
+    
     # 6. RL Networks
-    obs_dim = 6 # state(3) + base_action(3)
+    prop_dim = 6 # state(3) + base_action(3)
+    feat_dim = 768 if is_all_cams else 384
     action_dim = 3
-    actor = ResidualSACActor(obs_dim, action_dim, cfg.actor.hidden_dim, cfg.actor.action_scale, cfg.actor.last_layer_init_scale).to(device)
-    critic = REDQCriticEnsemble(obs_dim, action_dim, cfg.critic.hidden_dim, cfg.critic.num_q, cfg.critic.num_q_subsample).to(device)
+    actor = ResidualTD3Actor(feat_dim=feat_dim, prop_dim=prop_dim, action_dim=action_dim, hidden_dim=cfg.actor.hidden_dim, feature_dim=50, action_scale=cfg.actor.action_scale, last_layer_init_scale=cfg.actor.last_layer_init_scale).to(device)
+    actor_target = deepcopy(actor).to(device)
+    critic = REDQCriticEnsemble(feat_dim=feat_dim, prop_dim=prop_dim, action_dim=action_dim, hidden_dim=cfg.critic.hidden_dim, feature_dim=50, num_q=cfg.critic.num_q, num_q_subsample=cfg.critic.num_q_subsample).to(device)
     critic_target = deepcopy(critic).to(device)
     
-    log_alpha = torch.tensor(np.log(cfg.sac.init_temperature), dtype=torch.float32, device=device, requires_grad=True)
-    target_entropy = -action_dim
-
     actor_opt = torch.optim.Adam(actor.parameters(), lr=cfg.actor.lr)
     critic_opt = torch.optim.Adam(critic.parameters(), lr=cfg.critic.lr)
-    alpha_opt = torch.optim.Adam([log_alpha], lr=cfg.sac.alpha_lr)
 
     # 7. Replay Buffer & Offline Data
     print("Building Offline Transitions...")
     replay_buffer = SymmetricReplayBuffer(capacity=cfg.train.buffer_size, offline_fraction=cfg.train.offline_fraction)
     
+    # Extract DINO embeddings for all offline data
+    images_front = root['data/observation.images.front'][:]
+    images_top = root['data/observation.images.top'][:] if is_all_cams else None
+    
+    dino_embs_offline = []
+    print("Extracting DINO embeddings for offline data...")
+    for i in range(0, len(images_front), 64):
+        batch_front = images_front[i:i+64]
+        batch_front = torch.from_numpy(batch_front).permute(0, 3, 1, 2).float() / 255.0
+        batch_front = batch_front.to(device)
+        with torch.no_grad():
+            emb_front = dense_reward_calc.dino_encoder(batch_front)
+            if is_all_cams:
+                batch_top = images_top[i:i+64]
+                batch_top = torch.from_numpy(batch_top).permute(0, 3, 1, 2).float() / 255.0
+                batch_top = batch_top.to(device)
+                emb_top = dense_reward_calc.dino_encoder(batch_top)
+                emb = torch.cat([emb_front, emb_top], dim=1)
+            else:
+                emb = emb_front
+        dino_embs_offline.append(emb.cpu().numpy())
+    dino_embs_offline = np.concatenate(dino_embs_offline, axis=0)
+
     offline_transitions = []
     episode_ends = root['meta/episode_ends'][:]
     start_idx = 0
@@ -207,21 +242,24 @@ def main():
         for t in range(seq_len - 1):
             obs_state = state_standardizer.standardize(ep_states[t])
             obs_base_action = action_scaler.scale(ep_actions[t])
-            # Residual is zero for GT demo
+            obs_feat = dino_embs_offline[start_idx + t]
+            
             res_action = np.zeros(action_dim, dtype=np.float32)
-            # Analytical Dense Reward for expert demos
             discount_power = seq_len - 1 - t
             dense_r = (cfg.dense_reward.discount_gamma ** discount_power) * cfg.dense_reward.p_reward
             reward = -1.0 + dense_r
             next_obs_state = state_standardizer.standardize(ep_states[t+1])
             next_obs_base_action = action_scaler.scale(ep_actions[t+1])
+            next_obs_feat = dino_embs_offline[start_idx + t + 1]
             done = False
             
             offline_transitions.append({
+                'obs_feat': obs_feat,
                 'obs_state': obs_state,
                 'obs_base_action': obs_base_action,
                 'action': res_action,
                 'reward': float(reward),
+                'next_obs_feat': next_obs_feat,
                 'next_obs_state': next_obs_state,
                 'next_obs_base_action': next_obs_base_action,
                 'done': float(done)
@@ -230,20 +268,23 @@ def main():
         # Last step
         obs_state = state_standardizer.standardize(ep_states[-1])
         obs_base_action = action_scaler.scale(ep_actions[-1])
+        obs_feat = dino_embs_offline[end_idx - 1]
         res_action = np.zeros(action_dim, dtype=np.float32)
         discount_power = 0
         dense_r = (cfg.dense_reward.discount_gamma ** discount_power) * cfg.dense_reward.p_reward
         reward = 100.0 + dense_r # Success
-        # Next state is dummy (episode ends)
         next_obs_state = obs_state
         next_obs_base_action = obs_base_action
+        next_obs_feat = obs_feat
         done = True
         
         offline_transitions.append({
+            'obs_feat': obs_feat,
             'obs_state': obs_state,
             'obs_base_action': obs_base_action,
             'action': res_action,
             'reward': float(reward),
+            'next_obs_feat': next_obs_feat,
             'next_obs_state': next_obs_state,
             'next_obs_base_action': next_obs_base_action,
             'done': float(done)
@@ -255,7 +296,7 @@ def main():
 
     # 8. Initial Evaluation (Base Policy Zero-Shot Performance)
     print("Evaluating Base Policy (step 0)...")
-    base_success = evaluate(eval_env, base_policy, actor, action_scaler, state_standardizer, cfg, device, step=0, wandb_run=wandb.run if wandb else None)
+    base_success = evaluate(eval_env, base_policy, actor, action_scaler, state_standardizer, cfg, device, dense_reward_calc, is_all_cams, step=0, wandb_run=wandb.run if wandb else None)
     if wandb and wandb.run:
         wandb.log({'eval/success_rate': base_success}, step=0)
     print(f"Step 0 | Base Policy Eval Success: {base_success:.2%}")
@@ -271,15 +312,17 @@ def main():
     
     pbar = tqdm(range(cfg.train.total_timesteps))
     for step in pbar:
-        # Select action
-        if step < cfg.train.learning_starts:
-            residual_action = np.zeros(action_dim, dtype=np.float32)
-        elif step < cfg.train.critic_warmup_steps:
+        # Exploration noise schedule
+        stddev = cfg.actor.action_scale * max(0.01, 1.0 - step / (cfg.train.total_timesteps * 0.8))
+
+        # Sample action
+        if step < cfg.train.critic_warmup_steps:
             residual_action = np.random.uniform(-cfg.actor.action_scale, cfg.actor.action_scale, size=action_dim).astype(np.float32)
+            feat, prop = extract_feat_and_prop(obs, device, dense_reward_calc, is_all_cams)
         else:
-            obs_tensor = build_obs_tensor(obs, device)
+            feat, prop = extract_feat_and_prop(obs, device, dense_reward_calc, is_all_cams)
             with torch.no_grad():
-                residual_action, _, _ = actor(obs_tensor)
+                residual_action = actor.select_action(feat, prop, deterministic=False, stddev=stddev)
                 residual_action = residual_action.cpu().numpy().flatten()
                 
         # Step env
@@ -288,17 +331,22 @@ def main():
         
         # Compute dense reward
         front_img = torch.from_numpy(next_obs['observation.images.front']).unsqueeze(0).to(device)
-        top_img = torch.from_numpy(next_obs['observation.images.top']).unsqueeze(0).to(device)
+        top_img = torch.from_numpy(next_obs['observation.images.top']).unsqueeze(0).to(device) if is_all_cams else None
         done_tensor = torch.tensor([done], device=device)
         dense_r = dense_reward_calc.compute(front_img, done_tensor, top_images=top_img).item()
         total_reward = env_reward + dense_r
         
+        # Extract next feat for buffer
+        next_feat, _ = extract_feat_and_prop(next_obs, device, dense_reward_calc, is_all_cams)
+        
         # Store transition
         replay_buffer.add_online({
+            'obs_feat': feat.cpu().numpy().flatten(),
             'obs_state': obs['observation.state'],
             'obs_base_action': obs['observation.base_action'],
             'action': residual_action,
             'reward': float(total_reward),
+            'next_obs_feat': next_feat.cpu().numpy().flatten(),
             'next_obs_state': next_obs['observation.state'],
             'next_obs_base_action': next_obs['observation.base_action'],
             'done': float(done)
@@ -313,21 +361,21 @@ def main():
         # RL Update
         if step >= cfg.train.learning_starts and len(replay_buffer) >= cfg.train.batch_size:
             batch = replay_buffer.sample(cfg.train.batch_size, device)
-            if getattr(cfg.sac, 'learn_alpha', True):
-                alpha = log_alpha.exp()
-            else:
-                alpha = torch.tensor(cfg.sac.fixed_alpha, device=device)
             
             # -- Critic Update --
             with torch.no_grad():
-                next_obs_feat = torch.cat([batch['next_obs_state'], batch['next_obs_base_action']], dim=-1)
-                next_action, next_log_prob, _ = actor(next_obs_feat)
-                target_q = critic_target.q_target(next_obs_feat, next_action)
-                target_q = target_q - alpha.detach() * next_log_prob
+                next_prop = torch.cat([batch['next_obs_state'], batch['next_obs_base_action']], dim=-1)
+                next_action = actor_target.select_action(batch['next_obs_feat'], next_prop, deterministic=True, stddev=0.0)
+                # Add clipped noise to target action
+                noise = torch.randn_like(next_action) * 0.2
+                noise = torch.clamp(noise, -0.5, 0.5)
+                next_action = torch.clamp(next_action + noise, -cfg.actor.action_scale, cfg.actor.action_scale)
+                
+                target_q = critic_target.q_target(batch['next_obs_feat'], next_prop, next_action)
                 td_target = batch['reward'].unsqueeze(-1) + cfg.sac.discount * (1 - batch['done'].unsqueeze(-1)) * target_q
                 
-            obs_feat = torch.cat([batch['obs_state'], batch['obs_base_action']], dim=-1)
-            all_q = critic(obs_feat, batch['action']) # (num_q, B, 1)
+            prop = torch.cat([batch['obs_state'], batch['obs_base_action']], dim=-1)
+            all_q = critic(batch['obs_feat'], prop, batch['action']) # (num_q, B, 1)
             
             # Compute loss for all Q networks
             critic_loss = sum(F.mse_loss(all_q[i], td_target) for i in range(cfg.critic.num_q)) / cfg.critic.num_q
@@ -338,36 +386,36 @@ def main():
             
             # -- Actor Update --
             if step >= cfg.train.critic_warmup_steps and step % cfg.sac.actor_update_freq == 0:
-                obs_feat_actor = obs_feat.detach()
-                action_pred, log_prob_pred, _ = actor(obs_feat_actor)
-                q_for_actor = critic.q_for_policy(obs_feat_actor, action_pred)
+                feat_actor = batch['obs_feat'].detach()
+                prop_actor = prop.detach()
+                action_pred, _ = actor(feat_actor, prop_actor)
+                q_for_actor = critic.q_for_policy(feat_actor, prop_actor, action_pred)
                 
-                actor_loss = (alpha.detach() * log_prob_pred - q_for_actor).mean()
+                # TD3 Actor loss (maximize Q) + Action L2 Penalty
+                action_l2_reg_weight = 0.01 # L2 penalty weight
+                action_l2_penalty = action_l2_reg_weight * torch.mean(torch.sum(action_pred**2, dim=-1))
+                actor_loss = -q_for_actor.mean() + action_l2_penalty
                 
                 actor_opt.zero_grad()
                 actor_loss.backward()
                 actor_opt.step()
                 
-                if getattr(cfg.sac, 'learn_alpha', True):
-                    # -- Alpha Update --
-                    alpha_loss = -(log_alpha * (log_prob_pred.detach() + target_entropy)).mean()
-                    alpha_opt.zero_grad()
-                    alpha_loss.backward()
-                    alpha_opt.step()
-                
-            # -- Soft Update --
-            if step % cfg.sac.actor_update_freq == 0: # Usually coupled with actor update
-                for p, tp in zip(critic.parameters(), critic_target.parameters()):
-                    tp.data.lerp_(p.data, cfg.critic.target_tau)
-                    
+            # Update targets using polyak averaging
+            if step >= cfg.train.critic_warmup_steps and step % cfg.sac.target_update_freq == 0:
+                with torch.no_grad():
+                    for param, target_param in zip(critic.parameters(), critic_target.parameters()):
+                        target_param.data.copy_(cfg.sac.tau * param.data + (1 - cfg.sac.tau) * target_param.data)
+                    for param, target_param in zip(actor.parameters(), actor_target.parameters()):
+                        target_param.data.copy_(cfg.sac.tau * param.data + (1 - cfg.sac.tau) * target_param.data)
+                            
         # Logging step
-        if step % 200 == 0 and step >= cfg.train.learning_starts and wandb and wandb.run:
-            wandb.log({
-                'train/critic_loss': critic_loss.item(),
-                'train/alpha': alpha.item(),
-                'train/dense_reward': dense_r,
-                'train/step': step,
-            }, step=step)
+        if wandb and wandb.run and step >= cfg.train.critic_warmup_steps:
+            log_data = {'train/q_value': all_q.mean().item(), 'train/stddev': stddev}
+            if 'critic_loss' in locals(): log_data['train/critic_loss'] = critic_loss.item()
+            if 'actor_loss' in locals(): 
+                log_data['train/actor_loss'] = actor_loss.item()
+                log_data['train/action_l2_penalty'] = action_l2_penalty.item()
+            wandb.log(log_data, step=step)
             
         # Episode boundary
         if done:
@@ -392,7 +440,7 @@ def main():
             
         # Evaluation
         if step > 0 and step % cfg.eval.freq == 0:
-            eval_success = evaluate(eval_env, base_policy, actor, action_scaler, state_standardizer, cfg, device, step=step, wandb_run=wandb.run if wandb else None)
+            eval_success = evaluate(eval_env, base_policy, actor, action_scaler, state_standardizer, cfg, device, dense_reward_calc, is_all_cams, step=step, wandb_run=wandb.run if wandb else None)
             if wandb and wandb.run:
                 wandb.log({'eval/success_rate': eval_success}, step=step)
             pbar.write(f"Step {step} | Eval Success: {eval_success:.2%}")
