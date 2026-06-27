@@ -41,6 +41,7 @@ def parse_args():
     parser.add_argument('--base_policy_run_dir', type=str, required=True, help='Path to IL_policy output dir')
     parser.add_argument('--base_policy_checkpoint', type=str, default='best.pth')
     parser.add_argument('--base_policy_config', type=str, default='IL_policy/configs/base.yaml')
+    parser.add_argument('--latent_cache_path', type=str, required=True, help='Path to latent_cache.pt from phase 1')
     parser.add_argument('--seed', type=int, default=None)
     parser.add_argument('--wandb_mode', type=str, default=None)
     return parser.parse_args()
@@ -115,6 +116,11 @@ def main():
     
     # 1. Setup
     cfg = OmegaConf.load(args.config)
+    
+    # Override latent_cache_path from command line
+    if args.latent_cache_path:
+        cfg.latent_cache_path = args.latent_cache_path
+        
     seed = args.seed if args.seed is not None else cfg.seed
     set_seed(seed)
     

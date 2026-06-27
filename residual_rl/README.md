@@ -41,14 +41,15 @@ python -m residual_rl.scripts.train_latent_encoder
 - 실행이 완료되면 `residual_rl/outputs/latent_encoder-YYYYMMDD_HHMMSS/` 폴더가 생성되며, 그 안에 `latent_cache.pt`가 저장됩니다.
 - 멀티 카메라(Front+Top)를 활용하시려면 `--use_all_cameras` 인자를 추가하세요.
 
-### 2단계: 캐시 경로 업데이트 및 Residual RL 파인튜닝 (Phase 2)
-**⚠️ 중요**: 2단계를 실행하기 전, 반드시 설정 파일을 열고 `latent_cache_path`를 1단계에서 생성된 실제 폴더 경로로 변경해야 합니다.
+### 2단계: Residual RL 파인튜닝 (Phase 2)
+1단계에서 생성된 `latent_cache.pt` 파일의 경로를 `--latent_cache_path` 인자로 전달하여 훈련을 시작합니다.
 
 ```bash
 cd /home/ysl2683/gym-PlanarPeg
 python -m residual_rl.scripts.train_residual_rl \
     --config residual_rl/configs/residual_sac.yaml \
-    --base_policy_run_dir <IL_policy_결과_디렉토리_경로>
+    --base_policy_run_dir <IL_policy_결과_디렉토리_경로> \
+    --latent_cache_path <1단계에서_생성된_latent_cache.pt_경로>
 ```
 
 #### 📌 핵심 훈련 로직 (@resfit 100% 반영)
