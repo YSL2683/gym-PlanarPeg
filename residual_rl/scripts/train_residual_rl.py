@@ -20,7 +20,7 @@ sys.path.append(os.path.join(project_root, 'IL_policy'))
 from diffusion_policy import DiffusionPolicy
 
 # Import residual components
-from residual_rl.models.actor import ResidualSACActor
+from residual_rl.models.actor import ResidualTD3Actor
 from residual_rl.models.critic import REDQCriticEnsemble
 from residual_rl.utils.normalization import ActionScaler, StateStandardizer
 from residual_rl.utils.replay_buffer import SymmetricReplayBuffer
