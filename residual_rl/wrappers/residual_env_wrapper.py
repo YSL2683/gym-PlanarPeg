@@ -124,8 +124,8 @@ class PlanarPegResidualWrapper(gym.Wrapper):
         return aug_obs, info
 
     def step(self, residual_naction):
-        # 1. Combine actions (both are normalized to [-1, 1])
-        combined_naction = np.clip(self._last_base_naction + residual_naction, -1.0, 1.0)
+        # 1. Combine actions (residual is already bounded by actor's tanh * action_scale)
+        combined_naction = self._last_base_naction + residual_naction
         
         # 2. Unscale to physical action space
         env_action = self.action_scaler.unscale(combined_naction)
