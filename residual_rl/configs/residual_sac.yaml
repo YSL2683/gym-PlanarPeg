@@ -6,7 +6,7 @@ base_policy:
 # Environment
 env:
   id: "PlanarPegInsertion-v0"
-  grid: "ood_start_position"
+  grid: "ood_goal_position"
   max_episode_steps: 300
 
 # Dataset (for offline data + normalization stats)

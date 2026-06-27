@@ -355,7 +355,7 @@ def main():
             'next_obs_feat': next_feat.cpu().numpy().flatten(),
             'next_obs_state': next_obs['observation.state'],
             'next_obs_base_action': next_obs['observation.base_action'],
-            'done': float(done)
+            'done': float(terminated)
         })
         
         episode_reward += total_reward
@@ -373,8 +373,8 @@ def main():
                 next_prop = torch.cat([batch['next_obs_state'], batch['next_obs_base_action']], dim=-1)
                 next_action = actor_target.select_action(batch['next_obs_feat'], next_prop, deterministic=True, stddev=0.0)
                 # Add clipped noise to target action
-                noise = torch.randn_like(next_action) * 0.2
-                noise = torch.clamp(noise, -0.5, 0.5)
+                noise = torch.randn_like(next_action) * (0.2 * cfg.actor.action_scale)
+                noise = torch.clamp(noise, -0.5 * cfg.actor.action_scale, 0.5 * cfg.actor.action_scale)
                 next_action = torch.clamp(next_action + noise, -cfg.actor.action_scale, cfg.actor.action_scale)
                 
                 target_q = critic_target.q_target(batch['next_obs_feat'], next_prop, next_action)
