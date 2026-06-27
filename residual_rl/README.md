@@ -47,8 +47,8 @@ python -m residual_rl.scripts.train_latent_encoder
 ```bash
 cd /home/ysl2683/gym-PlanarPeg
 python -m residual_rl.scripts.train_residual_rl \
-    --config-name=train \
-    base_policy_run_dir=<IL_policy_결과_디렉토리_경로>
+    --config residual_rl/configs/residual_sac.yaml \
+    --base_policy_run_dir <IL_policy_결과_디렉토리_경로>
 ```
 
 #### 📌 핵심 훈련 로직 (@resfit 100% 반영)
